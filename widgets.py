@@ -122,7 +122,7 @@ class BaseWidget:
             width = self.bbox.width - 2 * self.padding
             self.child_bbox = []
             for c in self.children:
-                c.bbox = pg.Rect(x, y, width if c.req_width is None else c.req_width, c.req_height)
+                c.bbox = pg.Rect(x, y, min(c.req_width, width), c.req_height)
                 self.child_bbox.append(c.bbox)
                 y += c.req_height + self.padding
                 
@@ -168,13 +168,15 @@ class Label(BaseWidget):
     def __init__(self, parent, font, *,
                  text="Sample Label",
                  background=None,
-                 foreground=(0, 0, 0)):
+                 foreground=(0, 0, 0),
+                 align="left"):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param font: pygame Font object to use for rendering text
         :param text: the text to display in the label
         :param background: RGB tuple for the widget background (or None for transparent)
         :param foreground: RGB tuple for the text color
+        :param align: text alignment: 'left', 'center', or 'right'
         """
         super().__init__(
             parent,
@@ -185,11 +187,30 @@ class Label(BaseWidget):
         self.font = font
         self.text = text
         self.foreground = foreground
+        self.align = align
         self.req_width, self.req_height = self.font.size(self.text)
 
     def update_layout(self):
         super().update_layout()
         self.req_width, self.req_height = self.font.size(self.text)
+
+    def render(self, screen):
+        """
+        Renders the label text onto the screen.
+        :param screen: the pygame Surface to draw onto
+        """
+        super().render(screen)
+        if self.text:
+            text_surface = self.font.render(self.text, True, self.foreground)
+            text_rect = text_surface.get_rect()
+            # Align text within self.bbox
+            if self.align == "center":
+                text_rect.center = self.bbox.center
+            elif self.align == "right":
+                text_rect.midright = self.bbox.midright
+            else:  # "left" or fallback
+                text_rect.midleft = self.bbox.midleft
+            screen.blit(text_surface, text_rect)
 
 class Slider(BaseWidget):
     def __init__(self, parent, *,
@@ -243,17 +264,20 @@ class Slider(BaseWidget):
         frac = (x - left) / (right - left)
         return max(self.min, min(self.max, self.min + frac * (self.max - self.min)))
 
-    def process_event(self, event: pg.event.Event):
+    def process_event(self, event: pg.event.Event) -> bool:
         """
         Processes events.
         :param event: pygame event to process
+        :return: True if the value changed, False otherwise
         """
+        changed = False
         if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
             # If click anywhere inside the slider bbox, jump thumb and start dragging
             if self.bbox.collidepoint(event.pos):
                 mx, _ = event.pos
                 self.value = self._pos_to_value(mx)
                 self.dragging = True
+                changed = True
 
         elif event.type == pg.MOUSEBUTTONUP and event.button == 1:
             self.dragging = False
@@ -263,6 +287,8 @@ class Slider(BaseWidget):
             new_val = self._pos_to_value(mx)
             if new_val != self.value:
                 self.value = new_val
+                changed = True
+        return changed
 
     def render(self, screen):
         """
@@ -329,13 +355,19 @@ class TitledWidget(BaseWidget):
         self.in_bbox = None
         self.title = title
 
-        if padding is None:
-            self.padding = self.parent.padding
+        self.title_label = Label(
+            self,
+            font=self.title_font,
+            text=self.title,
+            background=None,
+            foreground=self.foreground
+        )
             
     def update_layout(self):
         """ Updates the layout of this widget based on its title and padding.
         This sets the in_bbox to the area where content should be drawn.
         """
+        self.title_label.text = self.title
         if self.title:
             h = self.title_font.get_height()
             self.in_bbox = pg.Rect(self.bbox.left + self.padding,
@@ -355,14 +387,11 @@ class TitledWidget(BaseWidget):
         :param screen: the pygame Surface to draw onto
         """
         super().render(screen)
-        if self.title:
-            screen.blit(self.title_font.render(self.title, True, self.foreground),
-                            (self.bbox.left + self.padding,
-                             self.bbox.top + self.padding))
             
 
 class SettingsWidget(TitledWidget):
-    settings_font = pg.font.SysFont('consolas', 12)
+    settings_font = pg.font.SysFont('consolas', 12, bold=True)
+    settings_label_font = pg.font.SysFont('consolas', 12, bold=False)
     def __init__(self, parent, *,
                  padding=None,
                  background=(255, 255, 255),
@@ -394,15 +423,55 @@ class SettingsWidget(TitledWidget):
             req_height=None,  # Height will be determined by content
             title=title
         )
-        self.req_height = self.title_font.get_height() + 2 * self.padding
+        self.settings_widgets = []
+        self.req_height = self.title_font.get_height() - self.padding
         self.attributes = attributes
         for attr in self.attributes:
             if attr["type"] == "slider":
-                slider = Slider(self, 
-                                min_val=attr["min"], 
-                                max_val=attr["max"], 
-                                value=attr["value"])
-                self.req_height += slider.req_height + self.padding
+                label = Label(
+                    self,
+                    font=self.settings_font,
+                    text=attr.get("name", "Unnamed Slider"),
+                    background=None,
+                    foreground=self.foreground
+                )
+                min_label = Label(
+                    self,
+                    font=self.settings_label_font,
+                    text=str(attr["min"]),
+                    background=None,
+                    foreground=self.foreground,
+                    align="left"
+                )
+                value_label = Label(
+                    self,
+                    font=self.settings_label_font,
+                    text=str(attr["value"]),
+                    background=None,
+                    foreground=self.foreground,
+                    align="center"
+                )
+                max_label = Label(
+                    self,
+                    font=self.settings_label_font,
+                    text=str(attr["max"]),
+                    background=None,
+                    foreground=self.foreground,
+                    align="right"
+                )
+                slider = Slider(self,
+                            min_val=attr["min"],
+                            max_val=attr["max"],
+                            value=attr["value"])
+                self.req_height += (slider.req_height + self.padding) * 3  # Slider + label
+                self.settings_widgets.append({
+                    "type": "slider",
+                    "label": label,
+                    "slider": slider,
+                    "min_label": min_label,
+                    "value_label": value_label,
+                    "max_label": max_label
+                })
 
     def update_layout(self):
         """ Updates the layout of this widget based on its title and padding.
@@ -411,15 +480,36 @@ class SettingsWidget(TitledWidget):
         super().update_layout()
 
         y = self.in_bbox.top
-        for c in self.children:
-            c.bbox = pg.Rect(
-                self.in_bbox.left,
-                y,
-                self.in_bbox.width,
-                c.req_height
-            )
-            y += c.req_height + self.padding
+        for s in self.settings_widgets:
+            if s["type"] == "slider":
+                for c in s["label"], s["value_label"], s["slider"]:
+                    bbox = pg.Rect(
+                            self.in_bbox.left,
+                            y,
+                            self.in_bbox.width,
+                            c.req_height
+                        )
+                    if c == s["value_label"]:
+                        s["value_label"].bbox = \
+                        s["min_label"].bbox = \
+                        s["max_label"].bbox = bbox
+                    else:
+                        c.bbox = bbox
+                    y += c.req_height + self.padding
 
+    def process_event(self, event) -> bool:
+        """
+        Processes events for all sliders in this widget.
+        :param event: pygame event to process
+        """
+        for i, s in enumerate(self.settings_widgets):
+            if s["type"] != "slider":
+                continue
+            slider = s["slider"]
+            changed = slider.process_event(event)
+            if changed:
+                self.attributes[i]["value"] = slider.value
+                s["value_label"].text = f"{slider.value:.2f}"
 
 if __name__ == "__main__":
     screen = pg.display.set_mode((640, 480), pg.RESIZABLE)
@@ -442,6 +532,7 @@ if __name__ == "__main__":
             if event.type == pg.QUIT:
                 running = False
             root.process_event(event)
+            
         screen.fill((0, 0, 0))
         root.render()
         pg.display.flip()
