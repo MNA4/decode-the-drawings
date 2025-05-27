@@ -88,12 +88,14 @@ class BaseWidget:
     def __init__(self, parent, *,
                  background=None,
                  req_width=200,
-                 req_height=200):
+                 req_height=200,
+                 padding=None):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param background: RGB tuple for the widget background (or None for transparent)
         :param req_width: the desired width of this widget
         :param req_height: the desired height of this widget
+        :param padding: spacing to apply around child widgets (optional)
         """
         self.parent = parent
         self.background = background
@@ -101,6 +103,11 @@ class BaseWidget:
         self.req_height = req_height
         self.bbox = None  # Will be set by the parent container
         self.children = []
+        self.child_bbox = []
+        if padding is not None:
+            self.padding = padding
+        else:
+            self.padding = self.parent.padding
 
         self.parent.add(self)
 
@@ -108,7 +115,19 @@ class BaseWidget:
         """
         Updates the layout of this widget.
         """
-        for c in self.children:
+        if self.children:
+            # Simple vertical layout: stack children top-to-bottom inside self.bbox with padding
+            x = self.bbox.left + self.padding
+            y = self.bbox.top + self.padding
+            width = self.bbox.width - 2 * self.padding
+            self.child_bbox = []
+            for c in self.children:
+                c.bbox = pg.Rect(x, y, width if c.req_width is None else c.req_width, c.req_height)
+                self.child_bbox.append(c.bbox)
+                y += c.req_height + self.padding
+                
+        for i, c in enumerate(self.children):
+            c.bbox = self.child_bbox[i]
             c.update_layout()
 
     def render(self, screen):
@@ -201,16 +220,16 @@ class Slider(BaseWidget):
         self.track_h = track_height
         self.track_color = track_color
         self.thumb_color = thumb_color
-        self.thumb_width = req_height  # Thumb is square, so width == height
-        self.thumb_width = req_height
+        self.thumb_width = req_height # Thumb is square, so width == height
+        self.thumb_height = req_height
 
         self.dragging = False  
 
     def _value_to_pos(self) -> int:
         """Convert current value to an x-coordinate for the thumb center.
         :return: x-coordinate for the thumb center"""
-        left = self.bbox.left + self.req_height // 2
-        right = self.bbox.right - self.req_height // 2
+        left = self.bbox.left + self.thumb_width // 2
+        right = self.bbox.right - self.thumb_width // 2
         frac = (self.value - self.min) / (self.max - self.min)
         return int(left + frac * (right - left))
 
@@ -219,8 +238,8 @@ class Slider(BaseWidget):
         :param x: x-coordinate to convert
         :return: value in the range [min, max]
         """
-        left = self.bbox.left + self.req_height // 2
-        right = self.bbox.right - self.req_height // 2
+        left = self.bbox.left + self.thumb_width // 2
+        right = self.bbox.right - self.thumb_width // 2
         frac = (x - left) / (right - left)
         return max(self.min, min(self.max, self.min + frac * (self.max - self.min)))
 
@@ -265,9 +284,16 @@ class Slider(BaseWidget):
         # Thumb
         thumb_x = self._value_to_pos()
         thumb_y = self.bbox.centery
-        pg.draw.rect(screen, self.thumb_color,
-                    (thumb_x - self.req_height // 2, thumb_y - self.req_height // 2,
-                     self.req_height, self.req_height))
+        pg.draw.rect(
+            screen,
+            self.thumb_color,
+            (
+            thumb_x - self.thumb_width // 2,
+            thumb_y - self.thumb_height // 2,
+            self.thumb_width,
+            self.thumb_height
+            )
+        )
 
 
 class TitledWidget(BaseWidget):
@@ -368,7 +394,7 @@ class SettingsWidget(TitledWidget):
             req_height=None,  # Height will be determined by content
             title=title
         )
-        self.req_height = self.title_font.get_height() + 3 * self.padding
+        self.req_height = self.title_font.get_height() + 2 * self.padding
         self.attributes = attributes
         for attr in self.attributes:
             if attr["type"] == "slider":
