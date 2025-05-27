@@ -1,19 +1,31 @@
 import numpy as np
 import pygame as pg
-from dataclasses import dataclass
 
 pg.init()
 pg.font.init()
 
-@dataclass
 class Root:
-    screen: pg.Surface
-    padding: int = 10
+    def __repr__(self):
+        string_repr = self.__class__.__name__
+        for attr in self.__dict__:
+            string_repr += f" {attr}={getattr(self, attr)}"
+        return '<'+string_repr+'>'
+    def __init__(self, screen: pg.Surface, *, padding: int = 10):
+        """
+        :param screen: the main pygame Surface to draw onto
+        :param padding: spacing to apply around child widgets
+        """
+        self.screen = screen
+        self.padding = padding
 
-    children = []
-    child_bbox = []
+        self.children = []
+        self.child_bbox = []
     
     def update_layout(self):
+        """
+        Updates the layout of child widgets based on their required sizes.
+        This arranges them in a vertical column on the right side of the screen.
+        """
         sw, sh = self.screen.get_size()
         max_w = max(self.children, key=lambda x:x.req_width).req_width
         pos = [sw - max_w - self.padding, self.padding]
@@ -26,15 +38,20 @@ class Root:
             pos[1] += c.req_height + self.padding
             if pos[1] + self.children[i+1].req_height + self.padding > sh:
                 pos[1] = self.padding
-                pos[0] -= max_w - self.padding
+                pos[0] -= max_w + self.padding
             
         self.child_bbox.append(pg.Rect(pos, (self.children[-1].req_width,
                                              self.children[-1].req_height)))
 
         for i,c in enumerate(self.children):
             c.bbox = self.child_bbox[i]
+            c.update_layout()
     
     def process_event(self, event):
+        """
+        Processes events for all widgets.
+        :param event: pygame event to process
+        """
         for i in self.children:
             i.process_event(event)
             
@@ -42,12 +59,22 @@ class Root:
             self.update_layout()
             
     def render(self):
+        """
+        Renders all child widgets onto the screen.
+        """
         for c in self.children:
             c.render(self.screen)
 
     def add(self, children):
-        self.children.append(children)
-        self.update_layout()
+        """
+        Adds a widget or list of widgets to the root container.
+        Don't use this method directly; use the widget constructors instead.
+        :param children: a single widget or a list of widgets to add
+        """
+        if isinstance(children, list):
+            self.children.extend(children)
+        else:
+            self.children.append(children)
         
 class BaseWidget:
     def __repr__(self):
@@ -56,10 +83,10 @@ class BaseWidget:
             if attr in ['in_bbox', 'bbox']:
                 continue
             string_repr += f" {attr}={getattr(self, attr)}"
-        return string_repr
+        return '<'+string_repr+'>'
     
     def __init__(self, parent, *,
-                 background=(255, 255, 255),
+                 background=None,
                  req_width=200,
                  req_height=200):
         """
@@ -73,19 +100,179 @@ class BaseWidget:
         self.req_width = req_width
         self.req_height = req_height
         self.bbox = None  # Will be set by the parent container
+        self.children = []
 
         self.parent.add(self)
+
+    def update_layout(self):
+        """
+        Updates the layout of this widget.
+        """
+        for c in self.children:
+            c.update_layout()
 
     def render(self, screen):
         """
         Draws the widget background onto 'screen' if background is set.
+        :param screen: the pygame Surface to draw onto
         """
         if self.background:
             pg.draw.rect(screen, self.background, self.bbox)
 
+        for c in self.children:
+            c.render(screen)
+
+    def process_event(self, event):
+        """
+        Processes events for this widget.
+        """
+        for c in self.children:
+            c.process_event(event)
+
+        # Default implementation does nothing, override in subclasses if needed
+        pass
+
+    def add(self, children):
+        """
+        Adds a widget or list of widgets to this widget.
+        Don't use this method directly; use the widget constructors instead.
+        By default, widgets doesn't do anything with children.
+        :param children: a single widget or a list of widgets to add
+        """
+        if isinstance(children, list):
+            self.children.extend(children)
+        else:
+            self.children.append(children)
+
+
+class Label(BaseWidget):
+    def __init__(self, parent, font, *,
+                 text="Sample Label",
+                 background=None,
+                 foreground=(0, 0, 0)):
+        """
+        :param parent: the container (e.g. Root) that will manage this widget
+        :param font: pygame Font object to use for rendering text
+        :param text: the text to display in the label
+        :param background: RGB tuple for the widget background (or None for transparent)
+        :param foreground: RGB tuple for the text color
+        """
+        super().__init__(
+            parent,
+            background=background,
+            req_width=None,  # Width will be determined by text
+            req_height=None,  # Height will be determined by text
+        )
+        self.font = font
+        self.text = text
+        self.foreground = foreground
+        self.req_width, self.req_height = self.font.size(self.text)
+
+    def update_layout(self):
+        super().update_layout()
+        self.req_width, self.req_height = self.font.size(self.text)
+
+class Slider(BaseWidget):
+    def __init__(self, parent, *,
+                 min_val=0.0,
+                 max_val=1.0,
+                 value=0.5,
+                 track_height=10,
+                 background=None,
+                 thumb_color=(50, 50, 50),
+                 track_color=(100, 100, 100),
+                 req_width=200,
+                 req_height=20):
+        """
+        :param min_val: minimum slider value
+        :param max_val: maximum slider value
+        :param value: initial value (clamped between min_val and max_val)
+        :param track_height: thickness of the track
+        """
+        super().__init__(
+            parent,
+            background=background,
+            req_width=req_width,
+            req_height=req_height,
+        )
+        self.min = min_val
+        self.max = max_val
+        self.value = max(min_val, min(max_val, value))
+        self.track_h = track_height
+        self.track_color = track_color
+        self.thumb_color = thumb_color
+        self.thumb_width = req_height  # Thumb is square, so width == height
+        self.thumb_width = req_height
+
+        self.dragging = False  
+
+    def _value_to_pos(self) -> int:
+        """Convert current value to an x-coordinate for the thumb center.
+        :return: x-coordinate for the thumb center"""
+        left = self.bbox.left + self.req_height // 2
+        right = self.bbox.right - self.req_height // 2
+        frac = (self.value - self.min) / (self.max - self.min)
+        return int(left + frac * (right - left))
+
+    def _pos_to_value(self, x: int) -> float:
+        """Convert an x-coordinate to a value in [min, max].
+        :param x: x-coordinate to convert
+        :return: value in the range [min, max]
+        """
+        left = self.bbox.left + self.req_height // 2
+        right = self.bbox.right - self.req_height // 2
+        frac = (x - left) / (right - left)
+        return max(self.min, min(self.max, self.min + frac * (self.max - self.min)))
+
+    def process_event(self, event: pg.event.Event):
+        """
+        Processes events.
+        :param event: pygame event to process
+        """
+        if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+            # If click anywhere inside the slider bbox, jump thumb and start dragging
+            if self.bbox.collidepoint(event.pos):
+                mx, _ = event.pos
+                self.value = self._pos_to_value(mx)
+                self.dragging = True
+
+        elif event.type == pg.MOUSEBUTTONUP and event.button == 1:
+            self.dragging = False
+
+        elif event.type == pg.MOUSEMOTION and self.dragging:
+            mx, _ = event.pos
+            new_val = self._pos_to_value(mx)
+            if new_val != self.value:
+                self.value = new_val
+
+    def render(self, screen):
+        """
+        Renders the widget.
+        :param screen: the pygame Surface to draw onto
+        """
+        # Draw background
+        super().render(screen)
+
+        # Track
+        track_rect = pg.Rect(
+            self.bbox.left,
+            self.bbox.centery - self.track_h // 2,
+            self.bbox.width,
+            self.track_h
+        )
+        pg.draw.rect(screen, self.track_color, track_rect)
+
+        # Thumb
+        thumb_x = self._value_to_pos()
+        thumb_y = self.bbox.centery
+        pg.draw.rect(screen, self.thumb_color,
+                    (thumb_x - self.req_height // 2, thumb_y - self.req_height // 2,
+                     self.req_height, self.req_height))
+
+
 class TitledWidget(BaseWidget):
 
-    font = pg.font.SysFont('consolas', 15)
+    title_font = pg.font.SysFont('consolas', 15, bold=True)
 
     def __init__(self, parent,
                  *,
@@ -119,15 +306,12 @@ class TitledWidget(BaseWidget):
         if padding is None:
             self.padding = self.parent.padding
             
-    def render(self, screen):
-        super().render(screen)
+    def update_layout(self):
+        """ Updates the layout of this widget based on its title and padding.
+        This sets the in_bbox to the area where content should be drawn.
+        """
         if self.title:
-            h = self.font.get_height()
-            screen.blit(self.font.render(self.title, True, self.foreground),
-                            (self.bbox.left + self.padding,
-                             self.bbox.top + self.padding)
-                        )
-                        
+            h = self.title_font.get_height()
             self.in_bbox = pg.Rect(self.bbox.left + self.padding,
                                    self.bbox.top + self.padding * 2 + h,
                                    self.bbox.width - 2 * self.padding,
@@ -137,17 +321,102 @@ class TitledWidget(BaseWidget):
                                    self.bbox.top + self.padding,
                                    self.bbox.width - 2 * self.padding,
                                    self.bbox.height - 2 * self.padding)
-        
+            
+        super().update_layout()
+            
+    def render(self, screen: pg.Surface):
+        """ Renders the widget.
+        :param screen: the pygame Surface to draw onto
+        """
+        super().render(screen)
+        if self.title:
+            screen.blit(self.title_font.render(self.title, True, self.foreground),
+                            (self.bbox.left + self.padding,
+                             self.bbox.top + self.padding))
+            
+
+class SettingsWidget(TitledWidget):
+    settings_font = pg.font.SysFont('consolas', 12)
+    def __init__(self, parent, *,
+                 padding=None,
+                 background=(255, 255, 255),
+                 foreground=(0, 0, 0),
+                 req_width=200,
+                 attributes=[
+                     {"type": "slider", 
+                      "min": 0.0, 
+                      "max": 100.0, 
+                      "value": 50.0, 
+                      "name": "Sample Slider"},
+                      ],
+                 title="Settings"):
+        """
+        :param parent: the container (e.g. Root) that will manage this widget
+        :param padding: padding around the content inside the widget
+        :param background: RGB tuple for the widget background (or None for transparent)
+        :param foreground: RGB tuple for the text color
+        :param req_width: the desired width of this widget
+        :param req_height: the desired height of this widget
+        :param title: the title text to display at the top of the widget
+        """
+        super().__init__(
+            parent,
+            padding=padding,
+            background=background,
+            foreground=foreground,
+            req_width=req_width,
+            req_height=None,  # Height will be determined by content
+            title=title
+        )
+        self.req_height = self.title_font.get_height() + 3 * self.padding
+        self.attributes = attributes
+        for attr in self.attributes:
+            if attr["type"] == "slider":
+                slider = Slider(self, 
+                                min_val=attr["min"], 
+                                max_val=attr["max"], 
+                                value=attr["value"])
+                self.req_height += slider.req_height + self.padding
+
+    def update_layout(self):
+        """ Updates the layout of this widget based on its title and padding.
+        This sets the in_bbox to the area where content should be drawn.
+        """
+        super().update_layout()
+
+        y = self.in_bbox.top
+        for c in self.children:
+            c.bbox = pg.Rect(
+                self.in_bbox.left,
+                y,
+                self.in_bbox.width,
+                c.req_height
+            )
+            y += c.req_height + self.padding
+
+
 if __name__ == "__main__":
-    screen = pg.display.set_mode((640, 480))
+    screen = pg.display.set_mode((640, 480), pg.RESIZABLE)
+    pg.display.set_caption("Widget Example")
+
     clock = pg.time.Clock()
     root = Root(screen)
+    slider = Slider(root)
     widget = TitledWidget(root)
+    settings = SettingsWidget(root,
+                              attributes=[
+                                  {"type": "slider", "min": 0, "max": 100, "value": 50, "name": "Volume"},
+                                  {"type": "slider", "min": 0, "max": 1, "value": 0.5, "name": "Brightness"}
+                              ],
+                              title="Settings")
+    root.update_layout() # Don't forget to call this after adding widgets
     running = True
     while running:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 running = False
+            root.process_event(event)
+        screen.fill((0, 0, 0))
         root.render()
         pg.display.flip()
         clock.tick(30)
