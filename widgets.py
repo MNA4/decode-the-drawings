@@ -1,10 +1,12 @@
-import numpy as np
 import pygame as pg
 
 pg.init()
 pg.font.init()
 
 class Root:
+    """
+    Root container for all widgets.
+    """
     def __repr__(self):
         string_repr = self.__class__.__name__
         for attr in self.__dict__:
@@ -20,11 +22,10 @@ class Root:
 
         self.children = []
         self.child_bbox = []
-    
+
     def update_layout(self):
         """
         Updates the layout of child widgets based on their required sizes.
-        This arranges them in a vertical column on the right side of the screen.
         """
         sw, sh = self.screen.get_size()
         max_w = max(self.children, key=lambda x:x.req_width).req_width
@@ -32,21 +33,21 @@ class Root:
 
         self.child_bbox = []
         for i,c in enumerate(self.children[:-1]):
-            
+
             self.child_bbox.append(pg.Rect(pos, (c.req_width, c.req_height)))
-            
+
             pos[1] += c.req_height + self.padding
             if pos[1] + self.children[i+1].req_height + self.padding > sh:
                 pos[1] = self.padding
                 pos[0] -= max_w + self.padding
-            
+
         self.child_bbox.append(pg.Rect(pos, (self.children[-1].req_width,
                                              self.children[-1].req_height)))
 
         for i,c in enumerate(self.children):
             c.bbox = self.child_bbox[i]
             c.update_layout()
-    
+
     def process_event(self, event):
         """
         Processes events for all widgets.
@@ -54,10 +55,10 @@ class Root:
         """
         for i in self.children:
             i.process_event(event)
-            
+
         if event.type == pg.VIDEORESIZE and self.children:
             self.update_layout()
-            
+
     def render(self):
         """
         Renders all child widgets onto the screen.
@@ -75,8 +76,11 @@ class Root:
             self.children.extend(children)
         else:
             self.children.append(children)
-        
+
 class BaseWidget:
+    """
+    Base class for all widgets.
+    """
     def __repr__(self):
         string_repr = self.__class__.__name__
         for attr in self.__dict__:
@@ -84,7 +88,7 @@ class BaseWidget:
                 continue
             string_repr += f" {attr}={getattr(self, attr)}"
         return '<'+string_repr+'>'
-    
+
     def __init__(self, parent, *,
                  background=None,
                  req_width=200,
@@ -125,7 +129,7 @@ class BaseWidget:
                 c.bbox = pg.Rect(x, y, min(c.req_width, width), c.req_height)
                 self.child_bbox.append(c.bbox)
                 y += c.req_height + self.padding
-                
+ 
         for i, c in enumerate(self.children):
             c.bbox = self.child_bbox[i]
             c.update_layout()
@@ -149,7 +153,6 @@ class BaseWidget:
             c.process_event(event)
 
         # Default implementation does nothing, override in subclasses if needed
-        pass
 
     def add(self, children):
         """
@@ -165,6 +168,9 @@ class BaseWidget:
 
 
 class Label(BaseWidget):
+    """
+    A simple text label widget.
+    """
     def __init__(self, parent, font, *,
                  text="Sample Label",
                  background=None,
@@ -213,6 +219,9 @@ class Label(BaseWidget):
             screen.blit(text_surface, text_rect)
 
 class Slider(BaseWidget):
+    """
+    A simple horizontal slider widget.
+    """
     def __init__(self, parent, *,
                  min_val=0.0,
                  max_val=1.0,
@@ -321,8 +330,108 @@ class Slider(BaseWidget):
             )
         )
 
+class RadioButtons(BaseWidget):
+    """
+    A simple vertical list of radio buttons using Label widgets.
+    """
+    def __init__(self, parent, *,
+                 options,
+                 selected=0,
+                 font=None,
+                 background=None,
+                 foreground=(0, 0, 0),
+                 req_width=200,
+                 req_height=None,
+                 padding=None,
+                 spacing=5):
+        """
+        :param parent: the container (e.g. Root) that will manage this widget
+        :param options: list of string options
+        :param selected: index of initially selected option
+        :param font: pygame Font object
+        :param background: RGB tuple for the widget background (or None for transparent)
+        :param foreground: RGB tuple for the text color
+        :param req_width: the desired width of this widget
+        :param req_height: the desired height of this widget (auto if None)
+        :param padding: spacing to apply around child widgets (optional)
+        :param spacing: vertical space between radio buttons
+        """
+        super().__init__(
+            parent,
+            background=background,
+            req_width=req_width,
+            req_height=req_height,
+            padding=padding
+        )
+        self.options = options
+        self.selected = selected
+        self.font = font
+        self.foreground = foreground
+        self.spacing = spacing
+        self.circle_radius = self.font.get_height() // 2
+        self.labels = [
+            Label(self,
+                  font=self.font,
+                  text=option,
+                  background=None, 
+                  foreground=self.foreground,
+                  align="left")
+            for option in options
+        ]
+        # Calculate required height
+        total_height = len(options) * (self.font.get_height() + self.spacing) - \
+                       self.spacing + 2 * self.padding
+        self.req_height = total_height
+
+    def update_layout(self):
+        # Position each label and store its bbox for hit testing
+        y = self.bbox.top + self.padding
+        for label in self.labels:
+            label.bbox = pg.Rect(
+                self.bbox.left + self.padding + 2 * self.circle_radius + self.spacing,
+                y,
+                self.bbox.width - 2 * self.padding - 2 * self.circle_radius - self.spacing,
+                self.font.get_height()
+            )
+            y += self.font.get_height() + self.spacing
+
+    def process_event(self, event):
+        if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            y = self.bbox.top + self.padding
+            for i in range(len(self.labels)):
+                # The clickable area includes the circle and the label
+                rect = pg.Rect(
+                    self.bbox.left + self.padding,
+                    y,
+                    self.bbox.width - 2 * self.padding,
+                    self.font.get_height()
+                )
+                if rect.collidepoint(mx, my):
+                    self.selected = i
+                    break
+                y += self.font.get_height() + self.spacing
+
+    def render(self, screen):
+        super().render(screen)
+
+        circle_x = self.bbox.left + self.padding + self.circle_radius
+        circle_y = self.bbox.top + self.padding + self.circle_radius
+        for i in range(len(self.labels)):
+            # Draw radio circle
+            pg.draw.circle(screen, self.foreground, (circle_x, circle_y), self.circle_radius, 2)
+            if i == self.selected:
+                pg.draw.circle(screen,
+                               self.foreground,
+                               (circle_x, circle_y),
+                               self.circle_radius - 4)
+            circle_y += self.font.get_height() + self.spacing
+
 
 class TitledWidget(BaseWidget):
+    """
+    A base widget with a title at the top.
+    """
 
     title_font = pg.font.SysFont('consolas', 15, bold=True)
 
@@ -343,7 +452,7 @@ class TitledWidget(BaseWidget):
         :param req_height: the desired height of this widget
         :param title: the title text to display at the top of the widget
         """
-        
+
         super().__init__(
             parent,
             background=background,
@@ -382,14 +491,11 @@ class TitledWidget(BaseWidget):
             
         super().update_layout()
             
-    def render(self, screen: pg.Surface):
-        """ Renders the widget.
-        :param screen: the pygame Surface to draw onto
-        """
-        super().render(screen)
-            
 
 class SettingsWidget(TitledWidget):
+    """
+    A widget for displaying and adjusting settings.
+    """
     settings_font = pg.font.SysFont('consolas', 12, bold=True)
     settings_label_font = pg.font.SysFont('consolas', 12, bold=False)
     def __init__(self, parent, *,
@@ -397,13 +503,13 @@ class SettingsWidget(TitledWidget):
                  background=(255, 255, 255),
                  foreground=(0, 0, 0),
                  req_width=200,
-                 attributes=[
+                 attributes=(
                      {"type": "slider", 
                       "min": 0.0, 
                       "max": 100.0, 
                       "value": 50.0, 
                       "name": "Sample Slider"},
-                      ],
+                      ),
                  title="Settings"):
         """
         :param parent: the container (e.g. Root) that will manage this widget
@@ -517,14 +623,35 @@ if __name__ == "__main__":
 
     clock = pg.time.Clock()
     root = Root(screen)
-    slider = Slider(root)
     widget = TitledWidget(root)
     settings = SettingsWidget(root,
                               attributes=[
-                                  {"type": "slider", "min": 0, "max": 100, "value": 50, "name": "Volume"},
-                                  {"type": "slider", "min": 0, "max": 1, "value": 0.5, "name": "Brightness"}
+                                  {
+                                      "type": "slider", 
+                                      "min": 0, 
+                                      "max": 100, 
+                                      "value": 50, 
+                                      "name": "Volume"
+                                      },
+                                  {
+                                      "type": "slider", 
+                                      "min": 0, 
+                                      "max": 1, 
+                                      "value": 0.5, 
+                                      "name": "Brightness"
+                                      }
                               ],
                               title="Settings")
+    radio = RadioButtons(
+        root,
+        options=["Option 1", "Option 2", "Option 3"],
+        selected=1,
+        font=pg.font.SysFont('consolas', 12),
+        background=(255, 255, 255),
+        foreground=(0, 0, 0),
+        req_width=200,
+        padding=10
+    )
     root.update_layout() # Don't forget to call this after adding widgets
     running = True
     while running:
@@ -532,10 +659,10 @@ if __name__ == "__main__":
             if event.type == pg.QUIT:
                 running = False
             root.process_event(event)
-            
+
         screen.fill((0, 0, 0))
         root.render()
         pg.display.flip()
         clock.tick(30)
-        
+
     pg.quit()
