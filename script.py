@@ -5,7 +5,7 @@ import av
 VIDEO_PATH = "3.mp4"
 PADDING = 10
 FPS = 60
-PIXEL_THRESHOLD = 120
+PIXEL_THRESHOLD = 80 #in percent
 #PEN_THRESHOLD = 1
 AUDIO_THRESHOLD = 0.0013
 INITIAL_Z = 18
@@ -35,11 +35,14 @@ def video_generator(filename):
             aud = None
     container.close()
 
-def get_all_balls(threshold_array):
-    pos = np.zeros([threshold_array.shape[2], 2])
-    radius = np.zeros([threshold_array.shape[2]])
-    for i in range(threshold_array.shape[2]):
-        ball_px = np.argwhere(threshold_array[:, :, i])
+def get_all_balls(frame_array, inv_threshold):
+    pos = np.zeros([3, 2])
+    radius = np.zeros([3])
+    sum_ = np.sum(frame_array, axis = 2) * inv_threshold
+    for i in range(3):
+        threshold_array = frame_array[:, :, i] > sum_
+        
+        ball_px = np.argwhere(threshold_array)
         pos[i]=np.average(ball_px, axis=0)
         
         # area = π × radius²
@@ -137,13 +140,12 @@ def get_bboxes(screen, padding, w, h, n_of_widgets):
         
     return rects
 
+
+inv_threshold = 100 / (PIXEL_THRESHOLD * 3)
+
 video = video_generator(VIDEO_PATH)
-
 frame_array, _ = next(video)
-threshold_array = frame_array>PIXEL_THRESHOLD
-
-ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
-
+ball_projected_pos, ball_projected_radius = get_all_balls(frame_array, inv_threshold)
 focal_length = calibrate_focal_length(*ball_projected_pos)
 
 
@@ -183,9 +185,8 @@ while running:
             print('done!')
             continue
         
-        threshold_array = frame_array>PIXEL_THRESHOLD
         
-        ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
+        ball_projected_pos, ball_projected_radius = get_all_balls(frame_array, inv_threshold)
         
         ball_actual_pos = np.zeros([ball_projected_pos.shape[0], 3])
         for i in range(ball_projected_pos.shape[0]):
@@ -215,8 +216,6 @@ while running:
         aud_intensity = np.sqrt(np.mean(aud_array**2))
         if aud_intensity > AUDIO_THRESHOLD:#pen_tip[1]<-PEN_LENGTH+PEN_THRESHOLD:
             pixels.append((pen_tip[0], pen_tip[2]))
-            
-        display_array = threshold_array*200
     
     screen.blit(pg.surfarray.make_surface(frame_array), (0,0))
         

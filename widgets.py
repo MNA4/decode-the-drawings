@@ -1,4 +1,5 @@
 import pygame as pg
+import numpy as np
 
 pg.init()
 pg.font.init()
@@ -217,6 +218,82 @@ class Label(BaseWidget):
             else:  # "left" or fallback
                 text_rect.midleft = self.bbox.midleft
             screen.blit(text_surface, text_rect)
+
+class Button(BaseWidget):
+    """
+    A simple clickable button widget.
+    """
+    def __init__(self, parent, *,
+                    text="Button",
+                    font=None,
+                    background=(100, 100, 100),
+                    foreground=(255, 255, 255),
+                    pressed_color=(50, 50, 50),
+                    req_width=100,
+                    req_height=30,
+                    padding=None,
+                    on_click=None):
+        """
+        :param parent: the container (e.g. Root) that will manage this widget
+        :param text: button label text
+        :param font: pygame Font object
+        :param background: normal background color
+        :param foreground: text color
+        :param pressed_color: background color when pressed
+        :param req_width: button width
+        :param req_height: button height
+        :param padding: padding around label
+        :param on_click: callback function for click event
+        """
+        super().__init__(
+            parent,
+            background=background,
+            req_width=req_width,
+            req_height=req_height,
+            padding=padding
+        )
+        self.font = font or pg.font.SysFont('consolas', 14, bold=True)
+        self.text = text
+        self.foreground = foreground
+        self.normal_color = background
+        self.pressed_color = pressed_color
+        self.on_click = on_click
+        self._pressed = False
+
+        # Use a Label widget for the button text
+        self.label = Label(
+            self,
+            font=self.font,
+            text=self.text,
+            background=None,
+            foreground=self.foreground,
+            align="center"
+        )
+
+    def update_layout(self):
+        self.label.text = self.text
+        pad = self.padding
+        self.label.bbox = pg.Rect(
+            self.bbox.left + pad,
+            self.bbox.top + pad,
+            self.bbox.width - 2 * pad,
+            self.bbox.height - 2 * pad
+        )
+
+    def process_event(self, event):
+        if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+            if self.bbox.collidepoint(event.pos):
+                self._pressed = True
+                self.background = self.pressed_color
+        elif event.type == pg.MOUSEBUTTONUP and event.button == 1:
+            if self._pressed and self.bbox.collidepoint(event.pos):
+                if self.on_click:
+                    self.on_click()
+            self._pressed = False
+            self.background = self.normal_color
+
+    def render(self, screen):
+        super().render(screen)
 
 class Slider(BaseWidget):
     """
@@ -578,6 +655,44 @@ class SettingsWidget(TitledWidget):
                     "value_label": value_label,
                     "max_label": max_label
                 })
+            elif attr["type"] == "radio":
+                label = Label(
+                    self,
+                    font=self.settings_font,
+                    text=attr.get("name", "Unnamed Radio"),
+                    background=None,
+                    foreground=self.foreground
+                )
+                radio = RadioButtons(
+                    self,
+                    options=attr.get("options", []),
+                    selected=attr.get("selected", 0),
+                    font=self.settings_label_font,
+                    background=None,
+                    foreground=self.foreground,
+                    req_width=req_width - 2 * self.padding,
+                    padding=0
+                )
+                # Estimate height: label + radio group
+                radio_height = radio.req_height if hasattr(radio, "req_height") else 40
+                self.req_height += label.req_height + radio_height + 2 * self.padding
+                self.settings_widgets.append({
+                    "type": "radio",
+                    "label": label,
+                    "radio": radio
+                })
+            elif attr["type"] == "button":
+                button = Button(
+                    self,
+                    text=attr.get("name", "Button"),
+                    on_click=attr.get("onclick"),
+                    req_width=req_width - 2 * self.padding if self.padding else req_width
+                )
+                self.req_height += button.req_height + self.padding
+                self.settings_widgets.append({
+                    "type": "button",
+                    "button": button
+                })
 
     def update_layout(self):
         """ Updates the layout of this widget based on its title and padding.
@@ -602,20 +717,159 @@ class SettingsWidget(TitledWidget):
                     else:
                         c.bbox = bbox
                     y += c.req_height + self.padding
+            elif s["type"] == "radio":
+                # Place label
+                s["label"].bbox = pg.Rect(
+                    self.in_bbox.left,
+                    y,
+                    self.in_bbox.width,
+                    s["label"].req_height
+                )
+                y += s["label"].req_height + self.padding
+                # Place radio group
+                s["radio"].bbox = pg.Rect(
+                    self.in_bbox.left,
+                    y,
+                    self.in_bbox.width,
+                    s["radio"].req_height
+                )
+                s["radio"].update_layout()
+                y += s["radio"].req_height + self.padding
+            elif s["type"] == "button":
+                s["button"].bbox = pg.Rect(
+                    self.in_bbox.left,
+                    y,
+                    self.in_bbox.width,
+                    s["button"].req_height
+                )
+                s["button"].update_layout()
+                y += s["button"].req_height + self.padding
 
     def process_event(self, event) -> bool:
         """
-        Processes events for all sliders in this widget.
+        Processes events for all sliders, radios, and buttons in this widget.
         :param event: pygame event to process
         """
         for i, s in enumerate(self.settings_widgets):
-            if s["type"] != "slider":
-                continue
-            slider = s["slider"]
-            changed = slider.process_event(event)
-            if changed:
-                self.attributes[i]["value"] = slider.value
-                s["value_label"].text = f"{slider.value:.2f}"
+            if s["type"] == "slider":
+                slider = s["slider"]
+                changed = slider.process_event(event)
+                if changed:
+                    self.attributes[i]["value"] = slider.value
+                    s["value_label"].text = f"{slider.value:.2f}"
+            elif s["type"] == "radio":
+                prev_selected = s["radio"].selected
+                s["radio"].process_event(event)
+                if s["radio"].selected != prev_selected:
+                    self.attributes[i]["selected"] = s["radio"].selected
+            elif s["type"] == "button":
+                s["button"].process_event(event)
+class AxisWidget(TitledWidget):
+    """
+    A widget that draws 2D projection of 3D axes inside its content area.
+    """
+    def __init__(self, parent, *, x, y, z, padding=None,
+                 background=(255,255,255), title="Axes"):
+        # Initialize as titled container
+        super().__init__(
+            parent,
+            padding=padding,
+            background=background,
+            foreground=(0,0,0),
+            req_width=200,
+            req_height=200,
+            title=title
+        )
+        # Axis vectors (2D projection of x, y, z)
+        self.x = np.array(x)
+        self.y = np.array(y)
+        self.z = np.array(z)
+
+    def set_axes(self, x, y, z):
+        """
+        Update the axis vectors and request redraw.
+        """
+        self.x = np.array(x)
+        self.y = np.array(y)
+        self.z = np.array(z)
+
+    def render(self, screen: pg.Surface):
+        # Draw background and title
+        super().render(screen)
+        # Draw axes within the content area
+        bbox = self.in_bbox
+        pad = self.padding
+        # Build origin and axis endpoints
+        origin = np.zeros(2)
+        proj = np.stack([origin, self.x[:2], self.y[:2], self.z[:2]])
+        # Compute bounds
+        mins = proj.min(axis=0)
+        maxs = proj.max(axis=0)
+        wh = maxs - mins
+        # Avoid division by zero
+        if max(wh) == 0:
+            return
+        scale = min((bbox.width-2*pad), (bbox.height-2*pad)) / max(wh)
+        center = np.array(bbox.center)
+        scaled = [((p[0]-mins[0]-wh[0]/2)*scale + center[0],
+                   (p[1]-mins[1]-wh[1]/2)*scale + center[1]) for p in proj]
+        # Draw each axis line
+        for i in range(3):
+            color = [255*(i==j) for j in range(3)]
+            pg.draw.line(screen, color, scaled[0], scaled[i+1], 3)
+
+
+class ImageWidget(TitledWidget):
+    """
+    A widget that plots 2D points and highlights a current position inside its content area.
+    """
+    def __init__(self, parent, *, pixels, curr_pos, padding=None,
+                 background=(255,255,255), title="Image Plot"):
+        super().__init__(
+            parent,
+            padding=padding,
+            background=background,
+            foreground=(0,0,0),
+            req_width=200,
+            req_height=200,
+            title=title
+        )
+        self.pixels = [tuple(p) for p in pixels]
+        self.curr_pos = tuple(curr_pos)
+
+    def set_data(self, pixels, curr_pos):
+        """
+        Update the list of pixels and current position.
+        """
+        self.pixels = [tuple(p) for p in pixels]
+        self.curr_pos = tuple(curr_pos)
+
+    def render(self, screen: pg.Surface):
+        super().render(screen)
+        bbox = self.in_bbox
+        pad = self.padding
+        # Combine points for bounding box
+        pts = np.vstack(self.pixels + [self.curr_pos]) if self.pixels else np.array(self.curr_pos)
+        mins = pts.min(axis=0)
+        maxs = pts.max(axis=0)
+        wh = maxs - mins
+        # Avoid division by zero
+        denom = np.max(wh)
+        if denom == 0:
+            denom = 1
+        scale = min((bbox.width-2*pad), (bbox.height-2*pad)) / denom
+        center = np.array(bbox.center)
+        # Draw current position
+        cp = ((self.curr_pos[0]-mins[0]-wh[0]/2)*scale + center[0],
+              (self.curr_pos[1]-mins[1]-wh[1]/2)*scale + center[1])
+        pg.draw.circle(screen, (0,0,0), (int(cp[0]), int(cp[1])), 5, 1)
+        # Draw all pixel points
+        if self.pixels:
+            pts_arr = np.array(self.pixels)
+            scaled = (pts_arr - mins - wh/2) * scale + center
+            for p in scaled:
+                pg.draw.rect(screen, (0,0,0), (int(p[0]), int(p[1]), 2, 2))
+
 
 if __name__ == "__main__":
     screen = pg.display.set_mode((640, 480), pg.RESIZABLE)
@@ -624,33 +878,36 @@ if __name__ == "__main__":
     clock = pg.time.Clock()
     root = Root(screen)
     widget = TitledWidget(root)
-    settings = SettingsWidget(root,
-                              attributes=[
-                                  {
-                                      "type": "slider", 
-                                      "min": 0, 
-                                      "max": 100, 
-                                      "value": 50, 
-                                      "name": "Volume"
-                                      },
-                                  {
-                                      "type": "slider", 
-                                      "min": 0, 
-                                      "max": 1, 
-                                      "value": 0.5, 
-                                      "name": "Brightness"
-                                      }
-                              ],
-                              title="Settings")
-    radio = RadioButtons(
+    settings = SettingsWidget(
         root,
-        options=["Option 1", "Option 2", "Option 3"],
-        selected=1,
-        font=pg.font.SysFont('consolas', 12),
-        background=(255, 255, 255),
-        foreground=(0, 0, 0),
-        req_width=200,
-        padding=10
+        attributes=[
+            {
+                "type": "slider",
+                "min": 0,
+                "max": 100,
+                "value": 50,
+                "name": "Volume"
+            },
+            {
+                "type": "slider",
+                "min": 0,
+                "max": 1,
+                "value": 0.5,
+                "name": "Brightness"
+            },
+            {
+                "type": "radio",
+                "name": "Mode",
+                "options": ["Easy", "Medium", "Hard"],
+                "selected": 1
+            },
+            {
+                "type": "button",
+                "name": "OK",
+                "onclick": None
+            }
+        ],
+        title="Settings"
     )
     root.update_layout() # Don't forget to call this after adding widgets
     running = True
@@ -659,10 +916,9 @@ if __name__ == "__main__":
             if event.type == pg.QUIT:
                 running = False
             root.process_event(event)
-
         screen.fill((0, 0, 0))
         root.render()
         pg.display.flip()
-        clock.tick(30)
+        clock.tick(60)
 
     pg.quit()
