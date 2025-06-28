@@ -28,6 +28,10 @@ class Root:
         """
         Updates the layout of child widgets based on their required sizes.
         """
+
+        if not self.children:
+            return
+
         sw, sh = self.screen.get_size()
         max_w = max(self.children, key=lambda x:x.req_width).req_width
         pos = [sw - max_w - self.padding, self.padding]
@@ -243,7 +247,7 @@ class Button(BaseWidget):
         :param req_width: button width
         :param req_height: button height
         :param padding: padding around label
-        :param on_click: callback function for click event
+        :param on_click: callback function for click event, when set to None, the button will not respond to clicks
         """
         super().__init__(
             parent,
@@ -595,7 +599,13 @@ class SettingsWidget(TitledWidget):
         :param foreground: RGB tuple for the text color
         :param req_width: the desired width of this widget
         :param req_height: the desired height of this widget
+        :param attributes: a list of dictionaries describing the settings to display
         :param title: the title text to display at the top of the widget
+        
+        Each dictionary should have a "type" key with one of the following values:
+        - "slider": for a slider, with keys "min", "max", "value", and optionally "name"
+        - "radio": for a radio button group, with keys "options", "selected", and optionally "name"
+        - "button": for a button, with keys "name" and optionally "onclick"
         """
         super().__init__(
             parent,
@@ -736,6 +746,8 @@ class SettingsWidget(TitledWidget):
                 s["radio"].update_layout()
                 y += s["radio"].req_height + self.padding
             elif s["type"] == "button":
+                if 'name' in s:
+                    s["button"].text = s["name"]
                 s["button"].bbox = pg.Rect(
                     self.in_bbox.left,
                     y,
@@ -909,6 +921,7 @@ if __name__ == "__main__":
         ],
         title="Settings"
     )
+
     root.update_layout() # Don't forget to call this after adding widgets
     running = True
     while running:
