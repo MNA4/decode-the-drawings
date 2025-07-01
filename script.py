@@ -23,7 +23,7 @@ def video_generator(filename):
     container = av.open(filename)
     vid = None
     aud = None
-    prev_aud = np.zeros((1,))
+    prev_aud = np.empty((1,))
     for frame in container.decode(video=0, audio=0):
         if isinstance(frame, av.audio.frame.AudioFrame):
             if aud is None:
@@ -53,8 +53,8 @@ def get_all_balls(frame_array, inv_threshold):
             - pos (numpy.ndarray): An array of shape (3, 2) containing the average positions of the balls.
             - radius (numpy.ndarray): An array of shape (3,) containing the calculated radii of the balls.
     """
-    pos = np.zeros([3, 2])
-    radius = np.zeros([3])
+    pos = np.empty([3, 2])
+    radius = np.empty([3])
     sum_ = np.sum(frame_array, axis = 2) * inv_threshold
     for i in range(3):
         threshold_array = frame_array[:, :, i] > sum_
@@ -128,6 +128,8 @@ def get_rays(projected_points, vw, vh, f):
     rays[:, 0] = projected_points[:, 0] - vw / 2
     rays[:, 1] = vh / 2 - projected_points[:, 1]
     rays[:, 2] = -f
+    # Normalize the rays to unit length
+    rays = rays / np.linalg.norm(rays, axis=1, keepdims=True)
     return rays
 
 def compute_ts(r1, r2, r3, side):
@@ -151,19 +153,15 @@ def compute_ts(r1, r2, r3, side):
     c12 = np.dot(r1, r2)
     c23 = np.dot(r2, r3)
     c13 = np.dot(r1, r3)
+    
+    u12, u23, u13 = 1 - c12, 1 - c23, 1 - c13
 
-    # Precompute auxiliary terms
-    a = 1.0 - c12
-    b = 1.0 - c23
-    c = 1.0 - c13
+    sqrt_d = np.sqrt(2.0 * u12 * u23 * u13)
 
-    # Compute t1, t2, t3 using closed-form
-    # t1 = side * sqrt((1 - c23) / (2 * (1 - c12) * (1 - c13)))
-    t1 = side * np.sqrt(b / (2.0 * a * c))
-    # t2 = side * sqrt((1 - c13) / (2 * (1 - c12) * (1 - c23)))
-    t2 = side * np.sqrt(c / (2.0 * a * b))
-    # t3 = side * sqrt((1 - c12) / (2 * (1 - c13) * (1 - c23)))
-    t3 = side * np.sqrt(a / (2.0 * b * c))
+    # Scale factors simplified (avoids multiple sqrt calls)
+    t1 = side * u23 / sqrt_d
+    t2 = side * u13 / sqrt_d
+    t3 = side * u12 / sqrt_d
 
     return t1, t2, t3
 
@@ -219,18 +217,23 @@ while running:
         
         ball_projected_pos, ball_projected_radius = get_all_balls(frame_array, inv_threshold)
         
-        ball_actual_pos = np.zeros([ball_projected_pos.shape[0], 3])
+        ball_actual_pos = np.empty([ball_projected_pos.shape[0], 3])
         ball_rays = get_rays(ball_projected_pos, width, height, focal_length)
-        
-        z = ball_actual_radius / ball_projected_radius * focal_length
-        scale_factors = -z / ball_rays[:, 2]
-        ball_actual_pos = ball_rays * scale_factors[:, np.newaxis]
+        # calculate the scale factors t1, t2, t3 such that P_i = t_i * r_i
+        t1, t2, t3 = compute_ts(ball_rays[0], ball_rays[1], ball_rays[2], INITIAL_DST)
+        # calculate the actual positions of the balls
+        ball_actual_pos[0] = t1 * ball_rays[0]
+        ball_actual_pos[1] = t2 * ball_rays[1]
+        ball_actual_pos[2] = t3 * ball_rays[2]
+
+        # z = ball_actual_radius / ball_projected_radius * focal_length
+        # scale_factors = -z / ball_rays[:, 2]
+        # ball_actual_pos = ball_rays * scale_factors[:, np.newaxis]
 
         # the triangle's orientation, from the camera's point of view
         x_axis = normalize(ball_actual_pos[1] - ball_actual_pos[2])
         z_axis = normalize(np.cross(x_axis, ball_actual_pos[0] - ball_actual_pos[2]))
         y_axis = -normalize(np.cross(x_axis, z_axis))
-
         non_oriented_cam_pos = - np.average(ball_actual_pos, axis = 0)
         
         # oriented camera pos
@@ -242,7 +245,7 @@ while running:
 
         pen_direction = y_axis * (1, -1, 1)
         pen_tip = cam_pos + pen_direction * PEN_LENGTH
-
+        print(f'pen tip: {pen_tip}')
         aud_intensity = np.sqrt(np.mean(aud_array**2))
         if aud_intensity > AUDIO_THRESHOLD:#pen_tip[1]<-PEN_LENGTH+PEN_THRESHOLD:
             pixels.append((pen_tip[0], pen_tip[2]))

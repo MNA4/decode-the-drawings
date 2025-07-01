@@ -781,15 +781,16 @@ class AxisWidget(TitledWidget):
     A widget that draws 2D projection of 3D axes inside its content area.
     """
     def __init__(self, parent, *, x, y, z, padding=None,
-                 background=(255,255,255), title="Axes"):
+                 background=(255,255,255), foreground=(0,0,0),
+                 req_width=200, req_height=200, title="Axes"):
         # Initialize as titled container
         super().__init__(
             parent,
             padding=padding,
             background=background,
-            foreground=(0,0,0),
-            req_width=200,
-            req_height=200,
+            foreground=foreground,
+            req_width=req_width,
+            req_height=req_height,
             title=title
         )
         # Axis vectors (2D projection of x, y, z)
@@ -836,7 +837,8 @@ class ImageWidget(TitledWidget):
     A widget that plots 2D points and highlights a current position inside its content area.
     """
     def __init__(self, parent, *, pixels, curr_pos, padding=None,
-                 background=(255,255,255), foreground=(0,0,0), title="Image Plot"):
+                 background=(255,255,255), foreground=(0,0,0), title="Image Plot",
+                 req_width=200, req_height=200):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param pixels: list of (x, y) tuples representing pixel positions
@@ -845,14 +847,16 @@ class ImageWidget(TitledWidget):
         :param background: RGB tuple for the widget background (or None for transparent)
         :param foreground: RGB tuple for the widget foreground
         :param title: the title text to display at the top of the widget
+        :param req_width: the desired width of this widget
+        :param req_height: the desired height of this widget
         """
         super().__init__(
             parent,
             padding=padding,
             background=background,
             foreground=foreground,
-            req_width=200,
-            req_height=200,
+            req_width=req_width,
+            req_height=req_height,
             title=title
         )
         self.pixels = [tuple(p) for p in pixels]
