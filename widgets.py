@@ -836,12 +836,21 @@ class ImageWidget(TitledWidget):
     A widget that plots 2D points and highlights a current position inside its content area.
     """
     def __init__(self, parent, *, pixels, curr_pos, padding=None,
-                 background=(255,255,255), title="Image Plot"):
+                 background=(255,255,255), foreground=(0,0,0), title="Image Plot"):
+        """
+        :param parent: the container (e.g. Root) that will manage this widget
+        :param pixels: list of (x, y) tuples representing pixel positions
+        :param curr_pos: the current position (x, y) of the point being highlighted
+        :param padding: spacing to apply around child widgets
+        :param background: RGB tuple for the widget background (or None for transparent)
+        :param foreground: RGB tuple for the widget foreground
+        :param title: the title text to display at the top of the widget
+        """
         super().__init__(
             parent,
             padding=padding,
             background=background,
-            foreground=(0,0,0),
+            foreground=foreground,
             req_width=200,
             req_height=200,
             title=title
@@ -861,7 +870,7 @@ class ImageWidget(TitledWidget):
         bbox = self.in_bbox
         pad = self.padding
         # Combine points for bounding box
-        pts = np.vstack(self.pixels + [self.curr_pos]) if self.pixels else np.array(self.curr_pos)
+        pts = np.vstack(self.pixels + [self.curr_pos]) if self.pixels else np.array([self.curr_pos])
         mins = pts.min(axis=0)
         maxs = pts.max(axis=0)
         wh = maxs - mins
@@ -872,15 +881,16 @@ class ImageWidget(TitledWidget):
         scale = min((bbox.width-2*pad), (bbox.height-2*pad)) / denom
         center = np.array(bbox.center)
         # Draw current position
-        cp = ((self.curr_pos[0]-mins[0]-wh[0]/2)*scale + center[0],
+        current_pos = ((self.curr_pos[0]-mins[0]-wh[0]/2)*scale + center[0],
               (self.curr_pos[1]-mins[1]-wh[1]/2)*scale + center[1])
-        pg.draw.circle(screen, (0,0,0), (int(cp[0]), int(cp[1])), 5, 1)
+        # Draw a hollowed (outlined) circle at the current position
+        pg.draw.circle(screen, (0, 0, 0), (int(current_pos[0]), int(current_pos[1])), 5, 1)
         # Draw all pixel points
         if self.pixels:
             pts_arr = np.array(self.pixels)
             scaled = (pts_arr - mins - wh/2) * scale + center
             for p in scaled:
-                pg.draw.rect(screen, (0,0,0), (int(p[0]), int(p[1]), 2, 2))
+                pg.draw.rect(screen, (0,0,0), (int(p[0]), int(p[1]), 1, 1))
 
 
 if __name__ == "__main__":
@@ -921,7 +931,20 @@ if __name__ == "__main__":
         ],
         title="Settings"
     )
-
+    # Example data for AxisWidget and ImageWidget
+    axis_widget = AxisWidget(
+        root,
+        x=[1, 0, 0],
+        y=[0, 1, 0],
+        z=[0, 0, 1],
+        title="3D Axes"
+    )
+    image_widget = ImageWidget(
+        root,
+        pixels=[(10, 10), (20, 30), (40, 50), (60, 80)],
+        curr_pos=(30, 40),
+        title="2D Points"
+    )
     root.update_layout() # Don't forget to call this after adding widgets
     running = True
     while running:

@@ -1,8 +1,9 @@
 import numpy as np
 import pygame as pg
 import av
-
+from widgets import Root, ImageWidget, AxisWidget
 VIDEO_PATH = "3.mp4"
+OUTPUT_FILENAME = 'pixels.txt'
 PADDING = 10
 FPS = 60
 PIXEL_THRESHOLD = 80 #in percent
@@ -13,6 +14,12 @@ PEN_LENGTH = 18
 INITIAL_DST = 9
 
 def video_generator(filename):
+    """Generator that yields video frames and audio samples from a video file.
+    Args:
+        filename (str): Path to the video file.
+    Yields:
+        tuple: A tuple containing a video frame (as a numpy array) and an audio sample (as a numpy array).
+    """
     container = av.open(filename)
     vid = None
     aud = None
@@ -36,6 +43,16 @@ def video_generator(filename):
     container.close()
 
 def get_all_balls(frame_array, inv_threshold):
+    """
+    Calculate the positions and radii of all balls in the frame.
+    Args:
+        frame_array (numpy.ndarray): The video frame as a 3D numpy array (width, height, channels).
+        inv_threshold (float): The inverse of the threshold for detecting ball pixels.  
+    Returns:
+        tuple: A tuple containing:
+            - pos (numpy.ndarray): An array of shape (3, 2) containing the average positions of the balls.
+            - radius (numpy.ndarray): An array of shape (3,) containing the calculated radii of the balls.
+    """
     pos = np.zeros([3, 2])
     radius = np.zeros([3])
     sum_ = np.sum(frame_array, axis = 2) * inv_threshold
@@ -52,13 +69,31 @@ def get_all_balls(frame_array, inv_threshold):
     return pos, radius
 
 def distance(v):
+    """Calculate the Euclidean distance of a vector.
+    Args:
+        v (numpy.ndarray): The input vector.
+    Returns:
+        float: The Euclidean distance of the vector.
+    """
     return np.linalg.norm(v)
 
 def normalize(v):
+    """Normalize a vector to unit length.
+    Args:
+        v (numpy.ndarray): The input vector.
+    Returns:
+        numpy.ndarray: The normalized vector.
+    """
     return v/distance(v)
 
 def calibrate_focal_length(*points):
-    
+    """
+    Calibrates the focal length of the camera based on the positions of the balls.
+    Args:
+        points (numpy.ndarray): The 3D coordinates of the balls.
+    Returns:
+        float: The computed focal length.
+    """
     #calculate average distance between points
     projected_length = 0
     for i in range(-1, len(points)-1):
@@ -78,7 +113,8 @@ def calibrate_focal_length(*points):
         
     return INITIAL_Z/INITIAL_DST*projected_length
     
-def get_ray(px, py, vw, vh, f):
+def get_rays(projected_points, vw, vh, f):
+    
     '''
         Pinhole Camera Model:
 
@@ -86,60 +122,50 @@ def get_ray(px, py, vw, vh, f):
         
         In this case i'm flipping the y & z axis for a right-handed coordinate system.
     '''
-    #rays = np.zeros((len(projected_points), 3))
-    #centered_points = projected_points-(vw/2, vh/2)
-    #rays[:, 0] = centered_points[:, 0]
-    #rays[:, 1] = centered_points[:, 1]
-    #rays[:, 2] = f
-    return np.array((px-vw/2, vh/2-py, -f))
+    projected_points = np.asarray(projected_points)
+    # Subtract center, flip y, set z to -f
+    rays = np.empty((projected_points.shape[0], 3))
+    rays[:, 0] = projected_points[:, 0] - vw / 2
+    rays[:, 1] = vh / 2 - projected_points[:, 1]
+    rays[:, 2] = -f
+    return rays
 
-def draw_axis(screen, bbox, padding, x, y, z):
-    projected_axis = np.array((1,-1))*([0, 0], x[0:2], y[0:2], z[0:2])
-    bound = [*np.min(projected_axis, axis=0), *np.max(projected_axis, axis=0)]
-    wh = bound[2]-bound[0], bound[3]-bound[1]
-    scale = min(bbox.width-padding*2, bbox.height-padding*2)/max(wh)
-    ui_center = bbox.center
-    scaled_axis = [((i[0]-bound[0]-wh[0]/2)*scale + ui_center[0],
-                    (i[1]-bound[1]-wh[1]/2)*scale + ui_center[1]) for i in projected_axis]
+def compute_ts(r1, r2, r3, side):
+    """
+    Compute the scale factors t1, t2, t3 such that P_i = t_i * r_i
+    form an equilateral triangle of side length `side`, given
+    unit direction vectors r1, r2, r3 (3-element arrays).
+
+    Args:
+    - r1, r2, r3: array-like, shape (3,)
+        Unit direction vectors (rays) from the camera origin.
+    - side: float
+        Desired side length of the reconstructed triangle.
+
+    Returns:
+    - t1, t2, t3: floats
+        Scaling factors along each ray to the triangle vertices.
+    """
     
-    pg.draw.rect(screen, (255,255,255), bbox)
-    for i in range(3):
-        pg.draw.line(screen, [255*(i==j) for j in range(3)], scaled_axis[0], scaled_axis[i+1], 5)
-  
-def draw_image(screen, bbox, padding, pixels, curr_pos):
-    pg.draw.rect(screen, (255,255,255), bbox)
-    bound = [*np.min(pixels+[curr_pos], axis=0), *np.max(pixels+[curr_pos], axis=0)]
-    wh = np.array((bound[2]-bound[0],
-                   bound[3]-bound[1]))
-    
-    scale = min(bbox.width-padding*2, bbox.height-padding*2)/max(max(wh),0.1)
-    ui_center = bbox.center
-    
-    pg.draw.circle(screen, (0,0,0),
-                  ((curr_pos[0]-bound[0]-wh[0]/2)*scale + ui_center[0],
-                   (curr_pos[1]-bound[1]-wh[1]/2)*scale + ui_center[1]), 5, 1)
+    # Compute dot products
+    c12 = np.dot(r1, r2)
+    c23 = np.dot(r2, r3)
+    c13 = np.dot(r1, r3)
 
-    if pixels:                       
-        scaled_pixels = (np.array(pixels)-bound[0:2]-wh/2)*scale + ui_center
-        
-        for i in scaled_pixels:
-            pg.draw.rect(screen, (0,0,0), (i, (1, 1)), 1)
+    # Precompute auxiliary terms
+    a = 1.0 - c12
+    b = 1.0 - c23
+    c = 1.0 - c13
 
-def get_bboxes(screen, padding, w, h, n_of_widgets):
-    sw, sh = screen.get_size()
-    pos = [sw - w - padding, padding]
+    # Compute t1, t2, t3 using closed-form
+    # t1 = side * sqrt((1 - c23) / (2 * (1 - c12) * (1 - c13)))
+    t1 = side * np.sqrt(b / (2.0 * a * c))
+    # t2 = side * sqrt((1 - c13) / (2 * (1 - c12) * (1 - c23)))
+    t2 = side * np.sqrt(c / (2.0 * a * b))
+    # t3 = side * sqrt((1 - c12) / (2 * (1 - c13) * (1 - c23)))
+    t3 = side * np.sqrt(a / (2.0 * b * c))
 
-    rects = [pg.Rect(pos, (w,h))]
-    for _ in range(1, n_of_widgets):
-        pos[1] += h + padding
-        if pos[1] + h + padding > sh:
-            pos[1] = padding
-            pos[0] -= h - padding
-
-        rects.append(pg.Rect(pos, (w,h)))
-        
-    return rects
-
+    return t1, t2, t3
 
 inv_threshold = 100 / (PIXEL_THRESHOLD * 3)
 
@@ -161,7 +187,11 @@ width = frame_array.shape[0]
 height = frame_array.shape[1]
 
 screen = pg.display.set_mode((width, height))
-axis_bbox, image_bbox = get_bboxes(screen, 10, 200, 250, 2)
+
+root = Root(screen)
+axis_widget = AxisWidget(root, x=None, y=None, z=None)
+image_widget = ImageWidget(root, pixels=[], curr_pos=(0, 0))
+root.update_layout()
 clock = pg.time.Clock()
 
 pixels = []
@@ -172,12 +202,13 @@ while running:
     for event in pg.event.get():
         if event.type == pg.QUIT:
             running = False
+        root.process_event(event)
             
     if not stopped:
         try:
             frame_array, aud_array = next(video)
         except StopIteration:
-            f = open('pixels.txt', 'w')
+            f = open(OUTPUT_FILENAME, 'wt')
             for i in pixels:
                 f.write('%s %s\n' % i)
             f.close()
@@ -189,12 +220,11 @@ while running:
         ball_projected_pos, ball_projected_radius = get_all_balls(frame_array, inv_threshold)
         
         ball_actual_pos = np.zeros([ball_projected_pos.shape[0], 3])
-        for i in range(ball_projected_pos.shape[0]):
-            ray = get_ray(*ball_projected_pos[i], width, height, focal_length)
-
-            # again here we use a Pinhole Camera Model to find z
-            z = ball_actual_radius[i] / ball_projected_radius[i] * focal_length
-            ball_actual_pos[i] = ray * -z/ray[2]
+        ball_rays = get_rays(ball_projected_pos, width, height, focal_length)
+        
+        z = ball_actual_radius / ball_projected_radius * focal_length
+        scale_factors = -z / ball_rays[:, 2]
+        ball_actual_pos = ball_rays * scale_factors[:, np.newaxis]
 
         # the triangle's orientation, from the camera's point of view
         x_axis = normalize(ball_actual_pos[1] - ball_actual_pos[2])
@@ -216,16 +246,22 @@ while running:
         aud_intensity = np.sqrt(np.mean(aud_array**2))
         if aud_intensity > AUDIO_THRESHOLD:#pen_tip[1]<-PEN_LENGTH+PEN_THRESHOLD:
             pixels.append((pen_tip[0], pen_tip[2]))
-    
+        
+        axis_widget.set_axes(x_axis * (1, -1, 1),
+                             y_axis * (1, -1, 1),
+                             z_axis * (1, -1, 1)) #pygame uses a left-handed coordinate system, so we flip the y-axis
+        image_widget.set_data(pixels, (pen_tip[0], pen_tip[2]))
+
     screen.blit(pg.surfarray.make_surface(frame_array), (0,0))
         
     for j in range(3):
         pg.draw.circle(screen, (255,255,255), ball_projected_pos[j], 10)
         pg.draw.circle(screen, (255,255,255), ball_projected_pos[j], ball_projected_radius[j], 5)
 
-    draw_axis(screen, axis_bbox, PADDING, x_axis, y_axis, z_axis)
-    draw_image(screen, image_bbox, PADDING, pixels, (pen_tip[0], pen_tip[2]))
+    # draw_axis(screen, axis_bbox, PADDING, x_axis, y_axis, z_axis)
+    # draw_image(screen, image_bbox, PADDING, pixels, (pen_tip[0], pen_tip[2]))
     
+    root.render()
     pg.display.flip()
     clock.tick(FPS)
     pg.display.set_caption(f'FPS: {clock.get_fps()}')
