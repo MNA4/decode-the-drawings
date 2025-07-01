@@ -2,23 +2,26 @@ import numpy as np
 import pygame as pg
 import av
 from widgets import Root, ImageWidget, AxisWidget
-VIDEO_PATH = "3.mp4"
-OUTPUT_FILENAME = 'pixels.txt'
+
+VIDEO_PATH = "2.mp4"
+OUTPUT_FILENAME = "pixels.txt"
 PADDING = 10
 FPS = 60
-PIXEL_THRESHOLD = 80 #in percent
-#PEN_THRESHOLD = 1
+PIXEL_THRESHOLD = 80  # in percent
+# PEN_THRESHOLD = 1
 AUDIO_THRESHOLD = 0.0013
 INITIAL_Z = 18
 PEN_LENGTH = 18
 INITIAL_DST = 9
+
 
 def video_generator(filename):
     """Generator that yields video frames and audio samples from a video file.
     Args:
         filename (str): Path to the video file.
     Yields:
-        tuple: A tuple containing a video frame (as a numpy array) and an audio sample (as a numpy array).
+        tuple: A tuple containing a video frame (as a numpy array)
+               and an audio sample (as a numpy array).
     """
     container = av.open(filename)
     vid = None
@@ -31,9 +34,9 @@ def video_generator(filename):
             else:
                 aud = np.concatenate((aud, frame.to_ndarray()[0]))
             continue
-        
+
         elif isinstance(frame, av.video.frame.VideoFrame):
-            vid = np.swapaxes(frame.to_rgb().to_ndarray(format='rgb24'), 0, 1)
+            vid = np.swapaxes(frame.to_rgb().to_ndarray(format="rgb24"), 0, 1)
             if aud is None:
                 yield vid, prev_aud
             else:
@@ -42,12 +45,13 @@ def video_generator(filename):
             aud = None
     container.close()
 
+
 def get_all_balls(frame_array, inv_threshold):
     """
     Calculate the positions and radii of all balls in the frame.
     Args:
         frame_array (numpy.ndarray): The video frame as a 3D numpy array (width, height, channels).
-        inv_threshold (float): The inverse of the threshold for detecting ball pixels.  
+        inv_threshold (float): The inverse of the threshold for detecting ball pixels.
     Returns:
         tuple: A tuple containing:
             - pos (numpy.ndarray): An array of shape (3, 2) containing the average positions of the balls.
@@ -55,18 +59,19 @@ def get_all_balls(frame_array, inv_threshold):
     """
     pos = np.empty([3, 2])
     radius = np.empty([3])
-    sum_ = np.sum(frame_array, axis = 2) * inv_threshold
+    sum_ = np.sum(frame_array, axis=2) * inv_threshold
     for i in range(3):
         threshold_array = frame_array[:, :, i] > sum_
-        
+
         ball_px = np.argwhere(threshold_array)
-        pos[i]=np.average(ball_px, axis=0)
-        
+        pos[i] = np.average(ball_px, axis=0)
+
         # area = π × radius²
         # radius = √(area ÷ π)
-        
-        radius[i] = np.sqrt(ball_px.shape[0]/np.pi)
+
+        radius[i] = np.sqrt(ball_px.shape[0] / np.pi)
     return pos, radius
+
 
 def distance(v):
     """Calculate the Euclidean distance of a vector.
@@ -77,6 +82,7 @@ def distance(v):
     """
     return np.linalg.norm(v)
 
+
 def normalize(v):
     """Normalize a vector to unit length.
     Args:
@@ -84,7 +90,8 @@ def normalize(v):
     Returns:
         numpy.ndarray: The normalized vector.
     """
-    return v/distance(v)
+    return v / distance(v)
+
 
 def calibrate_focal_length(*points):
     """
@@ -94,15 +101,15 @@ def calibrate_focal_length(*points):
     Returns:
         float: The computed focal length.
     """
-    #calculate average distance between points
+    # calculate average distance between points
     projected_length = 0
-    for i in range(-1, len(points)-1):
-        projected_length += distance(points[i] - points[i+1])
+    for i in range(-1, len(points) - 1):
+        projected_length += distance(points[i] - points[i + 1])
 
     projected_length /= 3
-    
+
     #    Pinhole Camera Model:
-    #    
+    #
     #    projected_length = f × actual_length ÷ z
     #
     #    We are given that:
@@ -110,27 +117,28 @@ def calibrate_focal_length(*points):
     #        z = 18cm
 
     #    focal_length f = projected_length × z ÷ actual_length
-        
-    return INITIAL_Z/INITIAL_DST*projected_length
-    
-def get_rays(projected_points, vw, vh, f):
-    
-    '''
-        Pinhole Camera Model:
 
-        ray = (projected_x - viewport_width ÷ 2, projected_y - viewport_height ÷ 2, focal_length)
-        
-        In this case i'm flipping the y & z axis for a right-handed coordinate system.
-    '''
+    return INITIAL_Z / INITIAL_DST * projected_length
+
+
+def get_rays(projected_points, vw, vh, f):
+    """
+    Pinhole Camera Model:
+
+    ray = (projected_x - viewport_width ÷ 2, projected_y - viewport_height ÷ 2, focal_length)
+
+    In this case i'm flipping the y & z axis for a right-handed coordinate system.
+    """
     projected_points = np.asarray(projected_points)
     # Subtract center, flip y, set z to -f
     rays = np.empty((projected_points.shape[0], 3))
     rays[:, 0] = projected_points[:, 0] - vw / 2
-    rays[:, 1] = vh / 2 - projected_points[:, 1]
+    rays[:, 1] = - (projected_points[:, 1] - vh / 2)
     rays[:, 2] = -f
     # Normalize the rays to unit length
     rays = rays / np.linalg.norm(rays, axis=1, keepdims=True)
     return rays
+
 
 def compute_ts(r1, r2, r3, side):
     """
@@ -148,12 +156,12 @@ def compute_ts(r1, r2, r3, side):
     - t1, t2, t3: floats
         Scaling factors along each ray to the triangle vertices.
     """
-    
+
     # Compute dot products
     c12 = np.dot(r1, r2)
     c23 = np.dot(r2, r3)
     c13 = np.dot(r1, r3)
-    
+
     u12, u23, u13 = 1 - c12, 1 - c23, 1 - c13
 
     sqrt_d = np.sqrt(2.0 * u12 * u23 * u13)
@@ -165,6 +173,7 @@ def compute_ts(r1, r2, r3, side):
 
     return t1, t2, t3
 
+
 inv_threshold = 100 / (PIXEL_THRESHOLD * 3)
 
 video = video_generator(VIDEO_PATH)
@@ -173,12 +182,12 @@ ball_projected_pos, ball_projected_radius = get_all_balls(frame_array, inv_thres
 focal_length = calibrate_focal_length(*ball_projected_pos)
 
 
-'''
+"""
     Pinhole Camera Model:
     
     projected_length = f × actual_length ÷ z
     actual_length = projected_length × z ÷ f
-'''
+"""
 ball_actual_radius = ball_projected_radius * INITIAL_Z / focal_length
 
 width = frame_array.shape[0]
@@ -201,72 +210,79 @@ while running:
         if event.type == pg.QUIT:
             running = False
         root.process_event(event)
-            
+
     if not stopped:
         try:
             frame_array, aud_array = next(video)
         except StopIteration:
-            f = open(OUTPUT_FILENAME, 'wt')
-            for i in pixels:
-                f.write('%s %s\n' % i)
-            f.close()
+            with open(OUTPUT_FILENAME, "w", encoding="utf-8") as f:
+                f.writelines(f"{i[0]} {i[1]}\n" for i in pixels)
             stopped = True
-            print('done!')
+            print("done!")
             continue
-        
-        
-        ball_projected_pos, ball_projected_radius = get_all_balls(frame_array, inv_threshold)
-        
+
+        ball_projected_pos, ball_projected_radius = get_all_balls(
+            frame_array, inv_threshold
+        )
+
         ball_actual_pos = np.empty([ball_projected_pos.shape[0], 3])
         ball_rays = get_rays(ball_projected_pos, width, height, focal_length)
         # calculate the scale factors t1, t2, t3 such that P_i = t_i * r_i
-        t1, t2, t3 = compute_ts(ball_rays[0], ball_rays[1], ball_rays[2], INITIAL_DST)
-        # calculate the actual positions of the balls
-        ball_actual_pos[0] = t1 * ball_rays[0]
-        ball_actual_pos[1] = t2 * ball_rays[1]
-        ball_actual_pos[2] = t3 * ball_rays[2]
+        # t1, t2, t3 = compute_ts(ball_rays[0], ball_rays[1], ball_rays[2], INITIAL_DST)
+        # # calculate the actual positions of the balls
+        # ball_actual_pos[0] = t1 * ball_rays[0]
+        # ball_actual_pos[1] = t2 * ball_rays[1]
+        # ball_actual_pos[2] = t3 * ball_rays[2]
 
-        # z = ball_actual_radius / ball_projected_radius * focal_length
-        # scale_factors = -z / ball_rays[:, 2]
-        # ball_actual_pos = ball_rays * scale_factors[:, np.newaxis]
+        z = ball_actual_radius / ball_projected_radius * focal_length
+        scale_factors = -z / ball_rays[:, 2]
+        ball_actual_pos = ball_rays * scale_factors[:, np.newaxis]
 
         # the triangle's orientation, from the camera's point of view
+        # x_axis = normalize(ball_actual_pos[1] - ball_actual_pos[2])
+        # y_axis = normalize(
+        #     ball_actual_pos[0] - (ball_actual_pos[1] + ball_actual_pos[2]) / 2
+        # )
+        # z_axis = normalize(np.cross(x_axis, y_axis))
         x_axis = normalize(ball_actual_pos[1] - ball_actual_pos[2])
         z_axis = normalize(np.cross(x_axis, ball_actual_pos[0] - ball_actual_pos[2]))
         y_axis = -normalize(np.cross(x_axis, z_axis))
-        non_oriented_cam_pos = - np.average(ball_actual_pos, axis = 0)
+        non_oriented_cam_pos = -np.average(ball_actual_pos, axis=0)
+        non_oriented_pen_tip = non_oriented_cam_pos - y_axis * PEN_LENGTH
         
-        # oriented camera pos
-        cam_pos = np.array((
-            np.dot(non_oriented_cam_pos, x_axis),
-            np.dot(non_oriented_cam_pos, y_axis),
-            np.dot(non_oriented_cam_pos, z_axis),
-            ))
-
-        pen_direction = y_axis * (1, -1, 1)
-        pen_tip = cam_pos + pen_direction * PEN_LENGTH
-        print(f'pen tip: {pen_tip}')
+        # Compute pen_tip in the triangle's local coordinate system
+        pen_tip = np.array(
+            (
+            np.dot(non_oriented_pen_tip, x_axis),
+            np.dot(non_oriented_pen_tip, y_axis),
+            np.dot(non_oriented_pen_tip, z_axis),
+            )
+        )
         aud_intensity = np.sqrt(np.mean(aud_array**2))
-        if aud_intensity > AUDIO_THRESHOLD:#pen_tip[1]<-PEN_LENGTH+PEN_THRESHOLD:
+        if aud_intensity > AUDIO_THRESHOLD:  # pen_tip[1]<-PEN_LENGTH+PEN_THRESHOLD:
             pixels.append((pen_tip[0], pen_tip[2]))
-        
-        axis_widget.set_axes(x_axis * (1, -1, 1),
-                             y_axis * (1, -1, 1),
-                             z_axis * (1, -1, 1)) #pygame uses a left-handed coordinate system, so we flip the y-axis
+
+        axis_widget.set_axes(
+            x_axis * (1, -1, 1),
+            y_axis * (1, -1, 1),
+            z_axis * (1, -1, 1)
+        )
         image_widget.set_data(pixels, (pen_tip[0], pen_tip[2]))
 
-    screen.blit(pg.surfarray.make_surface(frame_array), (0,0))
-        
-    for j in range(3):
-        pg.draw.circle(screen, (255,255,255), ball_projected_pos[j], 10)
-        pg.draw.circle(screen, (255,255,255), ball_projected_pos[j], ball_projected_radius[j], 5)
+    screen.blit(pg.surfarray.make_surface(frame_array), (0, 0))
 
-    # draw_axis(screen, axis_bbox, PADDING, x_axis, y_axis, z_axis)
-    # draw_image(screen, image_bbox, PADDING, pixels, (pen_tip[0], pen_tip[2]))
-    
+    for j in range(3):
+        pg.draw.circle(screen, (255, 255, 255), ball_projected_pos[j], 10)
+        pg.draw.circle(
+            screen, (255, 255, 255), ball_projected_pos[j], ball_projected_radius[j], 5
+        )
+        # Draw triangle connecting the three balls
+    pts = [tuple(ball_projected_pos[i]) for i in range(3)]
+    pg.draw.polygon(screen, (255, 255, 255), pts, 2)
+
     root.render()
     pg.display.flip()
     clock.tick(FPS)
-    pg.display.set_caption(f'FPS: {clock.get_fps()}')
-    
+    pg.display.set_caption(f"FPS: {clock.get_fps()}")
+
 pg.quit()
