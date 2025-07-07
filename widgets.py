@@ -13,7 +13,7 @@ class Root:
         for attr in self.__dict__:
             string_repr += f" {attr}={getattr(self, attr)}"
         return '<'+string_repr+'>'
-    def __init__(self, screen: pg.Surface, *, padding: int = 10):
+    def __init__(self, screen: pg.Surface, *, padding: int = 10) -> None:
         """
         :param screen: the main pygame Surface to draw onto
         :param padding: spacing to apply around child widgets
@@ -24,7 +24,7 @@ class Root:
         self.children = []
         self.child_bbox = []
 
-    def update_layout(self):
+    def update_layout(self) -> None:
         """
         Updates the layout of child widgets based on their required sizes.
         """
@@ -53,7 +53,7 @@ class Root:
             c.bbox = self.child_bbox[i]
             c.update_layout()
 
-    def process_event(self, event):
+    def process_event(self, event: pg.event.Event) -> None:
         """
         Processes events for all widgets.
         :param event: pygame event to process
@@ -64,14 +64,14 @@ class Root:
         if event.type == pg.VIDEORESIZE and self.children:
             self.update_layout()
 
-    def render(self):
+    def render(self) -> None:
         """
         Renders all child widgets onto the screen.
         """
         for c in self.children:
             c.render(self.screen)
 
-    def add(self, children):
+    def add(self, children) -> None:
         """
         Adds a widget or list of widgets to the root container.
         Don't use this method directly; use the widget constructors instead.
@@ -89,16 +89,15 @@ class BaseWidget:
     def __repr__(self):
         string_repr = self.__class__.__name__
         for attr in self.__dict__:
-            if attr in ['in_bbox', 'bbox']:
-                continue
-            string_repr += f" {attr}={getattr(self, attr)}"
+            if attr not in ['in_bbox', 'bbox', 'parent', 'children', 'child_bbox']:
+                string_repr += f" {attr}={getattr(self, attr)}"
         return '<'+string_repr+'>'
 
     def __init__(self, parent, *,
-                 background=None,
-                 req_width=200,
-                 req_height=200,
-                 padding=None):
+                 background: tuple[int, int, int]=None,
+                 req_width: int=200,
+                 req_height: int=200,
+                 padding: int=None):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param background: RGB tuple for the widget background (or None for transparent)
@@ -120,7 +119,7 @@ class BaseWidget:
 
         self.parent.add(self)
 
-    def update_layout(self):
+    def update_layout(self) -> None:
         """
         Updates the layout of this widget.
         """
@@ -139,7 +138,7 @@ class BaseWidget:
             c.bbox = self.child_bbox[i]
             c.update_layout()
 
-    def render(self, screen):
+    def render(self, screen: pg.Surface) -> None:
         """
         Draws the widget background onto 'screen' if background is set.
         :param screen: the pygame Surface to draw onto
@@ -150,7 +149,7 @@ class BaseWidget:
         for c in self.children:
             c.render(screen)
 
-    def process_event(self, event):
+    def process_event(self, event: pg.event.Event) -> None:
         """
         Processes events for this widget.
         """
@@ -159,7 +158,7 @@ class BaseWidget:
 
         # Default implementation does nothing, override in subclasses if needed
 
-    def add(self, children):
+    def add(self, children) -> None:
         """
         Adds a widget or list of widgets to this widget.
         Don't use this method directly; use the widget constructors instead.
@@ -170,17 +169,18 @@ class BaseWidget:
             self.children.extend(children)
         else:
             self.children.append(children)
-
+    def __del__(self):
+        self.parent.children.remove(self)
 
 class Label(BaseWidget):
     """
     A simple text label widget.
     """
-    def __init__(self, parent, font, *,
-                 text="Sample Label",
-                 background=None,
-                 foreground=(0, 0, 0),
-                 align="left"):
+    def __init__(self, parent, font: pg.font.Font, *,
+                 text: str = "Sample Label",
+                 background: tuple[int, int, int] = None,
+                 foreground: tuple[int, int, int] = (0, 0, 0),
+                 align: str = "left"):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param font: pygame Font object to use for rendering text
@@ -194,6 +194,7 @@ class Label(BaseWidget):
             background=background,
             req_width=None,  # Width will be determined by text
             req_height=None,  # Height will be determined by text
+            padding=0
         )
         self.font = font
         self.text = text
@@ -201,11 +202,11 @@ class Label(BaseWidget):
         self.align = align
         self.req_width, self.req_height = self.font.size(self.text)
 
-    def update_layout(self):
+    def update_layout(self) -> None:
         super().update_layout()
         self.req_width, self.req_height = self.font.size(self.text)
 
-    def render(self, screen):
+    def render(self, screen: pg.Surface) -> None:
         """
         Renders the label text onto the screen.
         :param screen: the pygame Surface to draw onto
@@ -228,15 +229,15 @@ class Button(BaseWidget):
     A simple clickable button widget.
     """
     def __init__(self, parent, *,
-                    text="Button",
-                    font=None,
-                    background=(100, 100, 100),
-                    foreground=(255, 255, 255),
-                    pressed_color=(50, 50, 50),
-                    req_width=100,
-                    req_height=30,
-                    padding=None,
-                    on_click=None):
+                    text: str = "Button",
+                    font: pg.font.Font = None,
+                    background: tuple[int, int, int] = (100, 100, 100),
+                    foreground: tuple[int, int, int] = (255, 255, 255),
+                    pressed_color: tuple[int, int, int] = (50, 50, 50),
+                    req_width: int = 100,
+                    req_height: int = 30,
+                    padding: int = None,
+                    on_click = None):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param text: button label text
@@ -274,7 +275,7 @@ class Button(BaseWidget):
             align="center"
         )
 
-    def update_layout(self):
+    def update_layout(self) -> None:
         self.label.text = self.text
         pad = self.padding
         self.label.bbox = pg.Rect(
@@ -284,7 +285,7 @@ class Button(BaseWidget):
             self.bbox.height - 2 * pad
         )
 
-    def process_event(self, event):
+    def process_event(self, event: pg.event.Event) -> None:
         if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
             if self.bbox.collidepoint(event.pos):
                 self._pressed = True
@@ -296,7 +297,7 @@ class Button(BaseWidget):
             self._pressed = False
             self.background = self.normal_color
 
-    def render(self, screen):
+    def render(self, screen: pg.Surface) -> None:
         super().render(screen)
 
 class Slider(BaseWidget):
@@ -304,15 +305,15 @@ class Slider(BaseWidget):
     A simple horizontal slider widget.
     """
     def __init__(self, parent, *,
-                 min_val=0.0,
-                 max_val=1.0,
-                 value=0.5,
-                 track_height=10,
-                 background=None,
-                 thumb_color=(50, 50, 50),
-                 track_color=(100, 100, 100),
-                 req_width=200,
-                 req_height=20):
+                 min_val: float = 0.0,
+                 max_val: float = 1.0,
+                 value: float = 0.5,
+                 track_height: int = 10,
+                 background: tuple[int, int, int] = None,
+                 thumb_color: tuple[int, int, int] = (50, 50, 50),
+                 track_color: tuple[int, int, int] = (100, 100, 100),
+                 req_width: int = 200,
+                 req_height: int = 20):
         """
         :param min_val: minimum slider value
         :param max_val: maximum slider value
@@ -380,7 +381,7 @@ class Slider(BaseWidget):
                 changed = True
         return changed
 
-    def render(self, screen):
+    def render(self, screen: pg.Surface) -> None:
         """
         Renders the widget.
         :param screen: the pygame Surface to draw onto
@@ -416,15 +417,15 @@ class RadioButtons(BaseWidget):
     A simple vertical list of radio buttons using Label widgets.
     """
     def __init__(self, parent, *,
-                 options,
-                 selected=0,
-                 font=None,
-                 background=None,
-                 foreground=(0, 0, 0),
-                 req_width=200,
-                 req_height=None,
-                 padding=None,
-                 spacing=5):
+                 options: list[str],
+                 selected: int = -1,
+                 font: pg.font.Font = None,
+                 background: tuple[int, int, int] = None,
+                 foreground: tuple[int, int, int] = (0, 0, 0),
+                 req_width: int = 200,
+                 req_height: int = None,
+                 padding: int = None,
+                 spacing: int = 5):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param options: list of string options
@@ -464,7 +465,7 @@ class RadioButtons(BaseWidget):
                        self.spacing + 2 * self.padding
         self.req_height = total_height
 
-    def update_layout(self):
+    def update_layout(self) -> None:
         # Position each label and store its bbox for hit testing
         y = self.bbox.top + self.padding
         for label in self.labels:
@@ -476,7 +477,7 @@ class RadioButtons(BaseWidget):
             )
             y += self.font.get_height() + self.spacing
 
-    def process_event(self, event):
+    def process_event(self, event: pg.event.Event) -> None:
         if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
             mx, my = event.pos
             y = self.bbox.top + self.padding
@@ -493,7 +494,7 @@ class RadioButtons(BaseWidget):
                     break
                 y += self.font.get_height() + self.spacing
 
-    def render(self, screen):
+    def render(self, screen: pg.Surface) -> None:
         super().render(screen)
 
         circle_x = self.bbox.left + self.padding + self.circle_radius
@@ -507,7 +508,102 @@ class RadioButtons(BaseWidget):
                                (circle_x, circle_y),
                                self.circle_radius - 4)
             circle_y += self.font.get_height() + self.spacing
+class Checkboxes(BaseWidget):
+    """
+    A vertical list of checkmarks (checkboxes).
+    """
+    def __init__(self, parent, *,
+                    options: list[str],
+                    checked: list[bool] = None,
+                    font: pg.font.Font = None,
+                    background: tuple[int, int, int] = None,
+                    foreground: tuple[int, int, int] = (0, 0, 0),
+                    req_width: int = 200,
+                    req_height: int = None,
+                    padding: int = None,
+                    spacing: int = 5):
+        """
+        :param parent: the container (e.g. Root) that will manage this widget
+        :param options: list of string options
+        :param checked: list of bools for initial checked state
+        :param font: pygame Font object
+        :param background: RGB tuple for the widget background (or None for transparent)
+        :param foreground: RGB tuple for the text color
+        :param req_width: the desired width of this widget
+        :param req_height: the desired height of this widget (auto if None)
+        :param padding: spacing to apply around child widgets (optional)
+        :param spacing: vertical space between checkmarks
+        """
+        super().__init__(
+            parent,
+            background=background,
+            req_width=req_width,
+            req_height=req_height,
+            padding=padding
+        )
+        self.options = options
+        self.checked = checked[:] if checked is not None else [False] * len(options)
+        self.font = font
+        self.foreground = foreground
+        self.spacing = spacing
+        self.box_size = self.font.get_height()
+        self.labels = [
+            Label(self,
+                    font=self.font,
+                    text=option,
+                    background=None,
+                    foreground=self.foreground,
+                    align="left")
+            for option in options
+        ]
+        total_height = len(options) * (self.font.get_height() + self.spacing) - \
+                        self.spacing + 2 * self.padding
+        self.req_height = total_height
 
+    def update_layout(self) -> None:
+        y = self.bbox.top + self.padding
+        for label in self.labels:
+            label.bbox = pg.Rect(
+                self.bbox.left + self.padding + self.box_size + self.spacing,
+                y,
+                self.bbox.width - 2 * self.padding - self.box_size - self.spacing,
+                self.font.get_height()
+            )
+            y += self.font.get_height() + self.spacing
+
+    def process_event(self, event: pg.event.Event) -> None:
+        if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            y = self.bbox.top + self.padding
+            for i in range(len(self.labels)):
+                rect = pg.Rect(
+                    self.bbox.left + self.padding,
+                    y,
+                    self.bbox.width - 2 * self.padding,
+                    self.font.get_height()
+                )
+                if rect.collidepoint(mx, my):
+                    self.checked[i] = not self.checked[i]
+                    break
+                y += self.font.get_height() + self.spacing
+
+    def render(self, screen: pg.Surface) -> None:
+        super().render(screen)
+        box_x = self.bbox.left + self.padding
+        box_y = self.bbox.top + self.padding
+        for i in range(len(self.labels)):
+            # Draw checkbox square
+            rect = pg.Rect(box_x, box_y, self.box_size, self.box_size)
+            pg.draw.rect(screen, self.foreground, rect, 1)
+            # Draw checkmark if checked
+            if self.checked[i]:
+                # Draw a simple checkmark (two lines)
+                x1, y1 = rect.left + 4, rect.centery
+                x2, y2 = rect.left + rect.width // 2, rect.bottom - 4
+                x3, y3 = rect.right - 4, rect.top + 4
+                pg.draw.line(screen, self.foreground, (x1, y1), (x2, y2), 2)
+                pg.draw.line(screen, self.foreground, (x2, y2), (x3, y3), 2)
+            box_y += self.font.get_height() + self.spacing
 
 class TitledWidget(BaseWidget):
     """
@@ -518,12 +614,12 @@ class TitledWidget(BaseWidget):
 
     def __init__(self, parent,
                  *,
-                 padding=None,
-                 background=(255, 255, 255),
-                 foreground=(0, 0, 0),
-                 req_width=200,
-                 req_height=200,
-                 title="Sample Widget"):
+                 padding: int = None,
+                 background: tuple[int, int, int] = (255, 255, 255),
+                 foreground: tuple[int, int, int] = (0, 0, 0),
+                 req_width: int = 200,
+                 req_height: int = 200,
+                 title: str = "Sample Widget"):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param padding: padding around the content inside the widget
@@ -539,6 +635,7 @@ class TitledWidget(BaseWidget):
             background=background,
             req_width=req_width,
             req_height=req_height,
+            padding=padding
         )
 
         self.foreground = foreground
@@ -552,8 +649,8 @@ class TitledWidget(BaseWidget):
             background=None,
             foreground=self.foreground
         )
-            
-    def update_layout(self):
+
+    def update_layout(self) -> None:
         """ Updates the layout of this widget based on its title and padding.
         This sets the in_bbox to the area where content should be drawn.
         """
@@ -580,12 +677,12 @@ class SettingsWidget(TitledWidget):
     settings_font = pg.font.SysFont('consolas', 12, bold=True)
     settings_label_font = pg.font.SysFont('consolas', 12, bold=False)
     def __init__(self, parent, *,
-                 padding=None,
-                 background=(255, 255, 255),
-                 foreground=(0, 0, 0),
-                 req_width=200,
+                 padding: int = None,
+                 background: tuple[int, int, int] = (255, 255, 255),
+                 foreground: tuple[int, int, int] = (0, 0, 0),
+                 req_width: int = 200,
                  attributes=(
-                     {"type": "slider", 
+                     {"type": "slider",
                       "min": 0.0, 
                       "max": 100.0, 
                       "value": 50.0, 
@@ -617,7 +714,7 @@ class SettingsWidget(TitledWidget):
             title=title
         )
         self.settings_widgets = []
-        self.req_height = self.title_font.get_height() - self.padding
+        self.req_height = self.title_font.get_height()
         self.attributes = attributes
         for attr in self.attributes:
             if attr["type"] == "slider":
@@ -656,7 +753,8 @@ class SettingsWidget(TitledWidget):
                             min_val=attr["min"],
                             max_val=attr["max"],
                             value=attr["value"])
-                self.req_height += (slider.req_height + self.padding) * 3  # Slider + label
+                self.req_height += label.req_height + value_label.req_height \
+                                + slider.req_height + self.padding * 4
                 self.settings_widgets.append({
                     "type": "slider",
                     "label": label,
@@ -676,20 +774,42 @@ class SettingsWidget(TitledWidget):
                 radio = RadioButtons(
                     self,
                     options=attr.get("options", []),
-                    selected=attr.get("selected", 0),
+                    selected=attr.get("selected", -1),
                     font=self.settings_label_font,
                     background=None,
                     foreground=self.foreground,
                     req_width=req_width - 2 * self.padding,
                     padding=0
                 )
-                # Estimate height: label + radio group
-                radio_height = radio.req_height if hasattr(radio, "req_height") else 40
-                self.req_height += label.req_height + radio_height + 2 * self.padding
+                self.req_height += label.req_height + radio.req_height + 2 * self.padding
                 self.settings_widgets.append({
                     "type": "radio",
                     "label": label,
                     "radio": radio
+                })
+            elif attr["type"] == "checkmark":
+                label = Label(
+                    self,
+                    font=self.settings_font,
+                    text=attr.get("name", "Unnamed Checkmark"),
+                    background=None,
+                    foreground=self.foreground
+                )
+                checkboxes = Checkboxes(
+                    self,
+                    options=attr.get("options", []),
+                    checked=attr.get("checked", [False] * len(attr.get("options", []))),
+                    font=self.settings_label_font,
+                    background=None,
+                    foreground=self.foreground,
+                    req_width=req_width - 2 * self.padding,
+                    padding=0
+                )
+                self.req_height += label.req_height + checkboxes.req_height + 2 * self.padding
+                self.settings_widgets.append({
+                    "type": "checkmark",
+                    "label": label,
+                    "checkmarks": checkboxes
                 })
             elif attr["type"] == "button":
                 button = Button(
@@ -704,22 +824,29 @@ class SettingsWidget(TitledWidget):
                     "button": button
                 })
 
-    def update_layout(self):
+    def update_layout(self) -> None:
         """ Updates the layout of this widget based on its title and padding.
         This sets the in_bbox to the area where content should be drawn.
         """
         super().update_layout()
 
         y = self.in_bbox.top
-        for s in self.settings_widgets:
+        for s,a in zip(self.settings_widgets, self.attributes):
             if s["type"] == "slider":
+                s["slider"].min = a["min"]
+                s["slider"].max = a["max"]
+                s["slider"].value = a["value"]
+                s["label"].text = a.get("name", "Unnamed Slider")
+                s["min_label"].text = str(a["min"])
+                s["max_label"].text = str(a["max"])
+                s["value_label"].text = f"{a['value']:.2f}"
                 for c in s["label"], s["value_label"], s["slider"]:
                     bbox = pg.Rect(
-                            self.in_bbox.left,
-                            y,
-                            self.in_bbox.width,
-                            c.req_height
-                        )
+                        self.in_bbox.left,
+                        y,
+                        self.in_bbox.width,
+                        c.req_height
+                    )
                     if c == s["value_label"]:
                         s["value_label"].bbox = \
                         s["min_label"].bbox = \
@@ -728,6 +855,36 @@ class SettingsWidget(TitledWidget):
                         c.bbox = bbox
                     y += c.req_height + self.padding
             elif s["type"] == "radio":
+                new_options = a.get("options", [])
+                s["radio"].selected = a.get("selected", -1)
+                old_labels = s["radio"].labels
+
+                # Remove extra labels if options decreased
+                if len(new_options) < len(old_labels):
+                    for _ in range(len(old_labels) - len(new_options)):
+                        label = s["radio"].labels.pop()
+                        if label in s["radio"].children:
+                            s["radio"].children.remove(label)
+                        if label in s["radio"].parent.children:
+                            s["radio"].parent.children.remove(label)
+                # Add new labels if options increased
+                elif len(new_options) > len(old_labels):
+                    for i in range(len(old_labels), len(new_options)):
+                        label = Label(
+                            s["radio"],
+                            font=s["radio"].font,
+                            text=new_options[i],
+                            background=None,
+                            foreground=s["radio"].foreground,
+                            align="left"
+                        )
+                        s["radio"].labels.append(label)
+                # Update label texts for all options
+                for label, option in zip(s["radio"].labels, new_options):
+                    label.text = option
+                s["radio"].options = new_options
+                # Update the radio title label
+                s["label"].text = a.get("name", "Unnamed Radio")
                 # Place label
                 s["label"].bbox = pg.Rect(
                     self.in_bbox.left,
@@ -745,6 +902,53 @@ class SettingsWidget(TitledWidget):
                 )
                 s["radio"].update_layout()
                 y += s["radio"].req_height + self.padding
+            elif s["type"] == "checkmark":
+                new_options = a.get("options", [])
+                new_checked = a.get("checked", [False] * len(new_options))
+                old_labels = s["checkmarks"].labels
+
+                # Remove extra labels if options decreased
+                if len(new_options) < len(old_labels):
+                    for _ in range(len(old_labels) - len(new_options)):
+                        label = s["checkmarks"].labels.pop()
+                        if label in s["checkmarks"].children:
+                            s["checkmarks"].children.remove(label)
+                        if label in s["checkmarks"].parent.children:
+                            s["checkmarks"].parent.children.remove(label)
+                # Add new labels if options increased
+                elif len(new_options) > len(old_labels):
+                    for i in range(len(old_labels), len(new_options)):
+                        label = Label(
+                            s["checkmarks"],
+                            font=s["checkmarks"].font,
+                            text=new_options[i],
+                            background=None,
+                            foreground=s["checkmarks"].foreground,
+                            align="left"
+                        )
+                        s["checkmarks"].labels.append(label)
+                # Update label texts for all options
+                for label, option in zip(s["checkmarks"].labels, new_options):
+                    label.text = option
+                s["checkmarks"].options = new_options
+                s["checkmarks"].checked = new_checked[:]
+                # Place label
+                s["label"].bbox = pg.Rect(
+                    self.in_bbox.left,
+                    y,
+                    self.in_bbox.width,
+                    s["label"].req_height
+                )
+                y += s["label"].req_height + self.padding
+                # Place checkmarks group
+                s["checkmarks"].bbox = pg.Rect(
+                    self.in_bbox.left,
+                    y,
+                    self.in_bbox.width,
+                    s["checkmarks"].req_height
+                )
+                s["checkmarks"].update_layout()
+                y += s["checkmarks"].req_height + self.padding
             elif s["type"] == "button":
                 if 'name' in s:
                     s["button"].text = s["name"]
@@ -756,8 +960,9 @@ class SettingsWidget(TitledWidget):
                 )
                 s["button"].update_layout()
                 y += s["button"].req_height + self.padding
+        self.req_height = y - self.bbox.top
 
-    def process_event(self, event) -> bool:
+    def process_event(self, event: pg.event.Event) -> bool:
         """
         Processes events for all sliders, radios, and buttons in this widget.
         :param event: pygame event to process
@@ -774,15 +979,20 @@ class SettingsWidget(TitledWidget):
                 s["radio"].process_event(event)
                 if s["radio"].selected != prev_selected:
                     self.attributes[i]["selected"] = s["radio"].selected
+            elif s["type"] == "checkmark":
+                prev_checked = s["checkmarks"].checked[:]
+                s["checkmarks"].process_event(event)
+                if s["checkmarks"].checked != prev_checked:
+                    self.attributes[i]["checked"] = s["checkmarks"].checked[:]
             elif s["type"] == "button":
                 s["button"].process_event(event)
 class AxisWidget(TitledWidget):
     """
     A widget that draws 2D projection of 3D axes inside its content area.
     """
-    def __init__(self, parent, *, x, y, z, padding=None,
-                 background=(255,255,255), foreground=(0,0,0),
-                 req_width=200, req_height=200, title="Axes"):
+    def __init__(self, parent: pg.Surface, *, x: np.ndarray, y: np.ndarray, z: np.ndarray, padding: int = None,
+                 background: tuple[int, int, int] = (255, 255, 255), foreground: tuple[int, int, int] = (0, 0, 0),
+                 req_width: int = 200, req_height: int = 200, title: str = "Axes"):
         # Initialize as titled container
         super().__init__(
             parent,
@@ -798,7 +1008,7 @@ class AxisWidget(TitledWidget):
         self.y = np.array(y)
         self.z = np.array(z)
 
-    def set_axes(self, x, y, z):
+    def set_axes(self, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> None:
         """
         Update the axis vectors and request redraw.
         """
@@ -806,7 +1016,7 @@ class AxisWidget(TitledWidget):
         self.y = np.array(y)
         self.z = np.array(z)
 
-    def render(self, screen: pg.Surface):
+    def render(self, screen: pg.Surface) -> None:
         # Draw background and title
         super().render(screen)
         # Draw axes within the content area
@@ -814,7 +1024,7 @@ class AxisWidget(TitledWidget):
         pad = self.padding
         # Build origin and axis endpoints
         origin = np.zeros(2)
-        proj = np.stack([origin, self.x[:2], self.y[:2], self.z[:2]])
+        proj = np.stack([origin, self.x[:2], -self.y[:2], self.z[:2]])
         # Compute bounds
         mins = proj.min(axis=0)
         maxs = proj.max(axis=0)
@@ -822,7 +1032,7 @@ class AxisWidget(TitledWidget):
         # Avoid division by zero
         if max(wh) == 0:
             return
-        scale = min((bbox.width-2*pad), (bbox.height-2*pad)) / max(wh)
+        scale = min(bbox.width, bbox.height) / max(wh)
         center = np.array(bbox.center)
         scaled = [((p[0]-mins[0]-wh[0]/2)*scale + center[0],
                    (p[1]-mins[1]-wh[1]/2)*scale + center[1]) for p in proj]
@@ -835,10 +1045,12 @@ class AxisWidget(TitledWidget):
 class ImageWidget(TitledWidget):
     """
     A widget that plots 2D points and highlights a current position inside its content area.
+    Includes a "Show Drawing" checkbox option.
     """
-    def __init__(self, parent, *, pixels, curr_pos, padding=None,
-                 background=(255,255,255), foreground=(0,0,0), title="Image Plot",
-                 req_width=200, req_height=200):
+    settings_font = pg.font.SysFont('consolas', 12, bold=False)
+    def __init__(self, parent: pg.Surface, *, pixels: list[tuple[int, int]], curr_pos: tuple[int, int], padding: int = None,
+                 background: tuple[int, int, int] = (255, 255, 255), foreground: tuple[int, int, int] = (0, 0, 0), title: str = "Image Plot",
+                 req_width: int = 200, req_height: int = 200):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param pixels: list of (x, y) tuples representing pixel positions
@@ -861,18 +1073,60 @@ class ImageWidget(TitledWidget):
         )
         self.pixels = [tuple(p) for p in pixels]
         self.curr_pos = tuple(curr_pos)
+        # Add "Show Drawing" checkbox
+        self.show_checkbox = Checkboxes(
+            self,
+            options=["Show Drawing"],
+            checked=[True],
+            font=self.settings_font,
+            background=None,
+            foreground=foreground,
+            req_width=req_width - 2 * self.padding,
+            padding=0,
+        )
+        self.show_checkbox_y_offset = 0  # Will be set in update_layout
 
-    def set_data(self, pixels, curr_pos):
+    def set_data(self, pixels: list[tuple[int, int]], curr_pos: tuple[int, int]) -> None:
         """
         Update the list of pixels and current position.
         """
         self.pixels = [tuple(p) for p in pixels]
         self.curr_pos = tuple(curr_pos)
 
-    def render(self, screen: pg.Surface):
+    def update_layout(self) -> None:
+        super().update_layout()
+        # Place the checkbox at the top of the content area
+        if self.in_bbox:
+            y = self.in_bbox.top
+            self.show_checkbox.bbox = pg.Rect(
+                self.in_bbox.left,
+                y,
+                self.in_bbox.width,
+                self.show_checkbox.req_height
+            )
+            self.show_checkbox.update_layout()
+            self.show_checkbox_y_offset = self.show_checkbox.req_height + self.padding
+
+    def process_event(self, event: pg.event.Event) -> None:
+        self.show_checkbox.process_event(event)
+
+    def render(self, screen: pg.Surface) -> None:
         super().render(screen)
+        # Draw the checkbox
+        self.show_checkbox.render(screen)
+        # Only draw points if "Show Drawing" is checked
+        if not self.show_checkbox.checked[0]:
+            return
         bbox = self.in_bbox
         pad = self.padding
+        # Adjust drawing area to be below the checkbox
+        y_offset = self.show_checkbox_y_offset
+        draw_bbox = pg.Rect(
+            bbox.left,
+            bbox.top + y_offset,
+            bbox.width,
+            bbox.height - y_offset
+        )
         # Combine points for bounding box
         pts = np.vstack(self.pixels + [self.curr_pos]) if self.pixels else np.array([self.curr_pos])
         mins = pts.min(axis=0)
@@ -882,8 +1136,8 @@ class ImageWidget(TitledWidget):
         denom = np.max(wh)
         if denom == 0:
             denom = 1
-        scale = min((bbox.width-2*pad), (bbox.height-2*pad)) / denom
-        center = np.array(bbox.center)
+        scale = min(draw_bbox.width, draw_bbox.height) / denom
+        center = np.array(draw_bbox.center)
         # Draw current position
         current_pos = ((self.curr_pos[0]-mins[0]-wh[0]/2)*scale + center[0],
               (self.curr_pos[1]-mins[1]-wh[1]/2)*scale + center[1])
@@ -932,6 +1186,13 @@ if __name__ == "__main__":
                 "name": "OK",
                 "onclick": None
             }
+            ,
+            {
+                "type": "checkmark",
+                "name": "Options",
+                "options": ["A", "B", "C"],
+                "checked": [True, False, False]
+            }
         ],
         title="Settings"
     )
@@ -948,6 +1209,13 @@ if __name__ == "__main__":
         pixels=[(10, 10), (20, 30), (40, 50), (60, 80)],
         curr_pos=(30, 40),
         title="2D Points"
+    )
+    checkmarks = Checkboxes(
+        root,
+        options=["Option 1", "Option 2", "Option 3"],
+        font=pg.font.SysFont('consolas', 12),
+        background=(255, 255, 255),
+        checked=[True, False, True],
     )
     root.update_layout() # Don't forget to call this after adding widgets
     running = True
