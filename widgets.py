@@ -1,3 +1,8 @@
+"""
+widgets.py
+Custom UI toolkit for pygame, including Root container, BaseWidget, and various widget types (Label, Button, Slider, RadioButtons, Checkboxes, TitledWidget, SettingsWidget, AxisWidget, ImageWidget).
+"""
+
 import pygame as pg
 import numpy as np
 
@@ -6,13 +11,14 @@ pg.font.init()
 
 class Root:
     """
-    Root container for all widgets.
+    Root container for all widgets. Manages layout, event processing, and rendering.
     """
     def __repr__(self):
         string_repr = self.__class__.__name__
         for attr in self.__dict__:
             string_repr += f" {attr}={getattr(self, attr)}"
         return '<'+string_repr+'>'
+
     def __init__(self, screen: pg.Surface, *, padding: int = 10) -> None:
         """
         :param screen: the main pygame Surface to draw onto
@@ -20,7 +26,6 @@ class Root:
         """
         self.screen = screen
         self.padding = padding
-
         self.children = []
         self.child_bbox = []
 
@@ -84,7 +89,7 @@ class Root:
 
 class BaseWidget:
     """
-    Base class for all widgets.
+    Base class for all widgets. Handles layout, background, and child management.
     """
     def __repr__(self):
         string_repr = self.__class__.__name__
@@ -121,7 +126,7 @@ class BaseWidget:
 
     def update_layout(self) -> None:
         """
-        Updates the layout of this widget.
+        Updates the layout of this widget and its children.
         """
         if self.children:
             # Simple vertical layout: stack children top-to-bottom inside self.bbox with padding
@@ -133,44 +138,42 @@ class BaseWidget:
                 c.bbox = pg.Rect(x, y, min(c.req_width, width), c.req_height)
                 self.child_bbox.append(c.bbox)
                 y += c.req_height + self.padding
- 
         for i, c in enumerate(self.children):
             c.bbox = self.child_bbox[i]
             c.update_layout()
 
     def render(self, screen: pg.Surface) -> None:
         """
-        Draws the widget background onto 'screen' if background is set.
+        Draws the widget background onto 'screen' if background is set, then renders children.
         :param screen: the pygame Surface to draw onto
         """
         if self.background:
             pg.draw.rect(screen, self.background, self.bbox)
-
         for c in self.children:
             c.render(screen)
 
     def process_event(self, event: pg.event.Event) -> None:
         """
-        Processes events for this widget.
+        Processes events for this widget and its children.
         """
         for c in self.children:
             c.process_event(event)
-
         # Default implementation does nothing, override in subclasses if needed
 
     def add(self, children) -> None:
         """
         Adds a widget or list of widgets to this widget.
         Don't use this method directly; use the widget constructors instead.
-        By default, widgets doesn't do anything with children.
         :param children: a single widget or a list of widgets to add
         """
         if isinstance(children, list):
             self.children.extend(children)
         else:
             self.children.append(children)
+
     def __del__(self):
-        self.parent.children.remove(self)
+        if self.parent and self in self.parent.children:
+            self.parent.children.remove(self)
 
 class Label(BaseWidget):
     """

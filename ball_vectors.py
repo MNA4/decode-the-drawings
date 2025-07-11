@@ -1,7 +1,13 @@
+"""
+ball_vectors.py
+Mathematical utilities for 3D geometry, camera calibration, and orientation estimation for the Decode the Drawings project.
+"""
+
 import numpy as np
 
 def distance(v: np.ndarray) -> float:
-    """Calculate the Euclidean distance of a vector.
+    """
+    Calculate the Euclidean distance (L2 norm) of a vector.
     Args:
         v (numpy.ndarray): The input vector.
     Returns:
@@ -11,7 +17,8 @@ def distance(v: np.ndarray) -> float:
 
 
 def normalize(v: np.ndarray) -> np.ndarray:
-    """Normalize a vector to unit length.
+    """
+    Normalize a vector to unit length.
     Args:
         v (numpy.ndarray): The input vector.
     Returns:
@@ -24,27 +31,20 @@ def calibrate_focal_length(*points: np.ndarray, initial_z: float, initial_dst: f
     """
     Calibrates the focal length of the camera based on the positions of the balls.
     Args:
-        points (numpy.ndarray): The 3D coordinates of the balls.
+        points (numpy.ndarray): The 2D projected coordinates of the balls.
+        initial_z (float): The initial z distance from the camera to the balls in cm.
+        initial_dst (float): The initial distance between the balls in cm.
     Returns:
         float: The computed focal length.
     """
-    # calculate average distance between points
+    # Calculate average distance between points (assumes 3 points)
     projected_length = 0
     for i in range(-1, len(points) - 1):
         projected_length += distance(points[i] - points[i + 1])
-
     projected_length /= 3
-
-    #    Pinhole Camera Model:
-    #
-    #    projected_length = f × actual_length ÷ z
-    #
-    #    We are given that:
-    #        actual_length = 9cm
-    #        z = 18cm
-
-    #    focal_length f = projected_length × z ÷ actual_length
-
+    # Pinhole Camera Model:
+    # projected_length = f × actual_length ÷ z
+    # focal_length f = projected_length × z ÷ actual_length
     return initial_z / initial_dst * projected_length
 
 
@@ -58,13 +58,11 @@ def get_rays(projected_points: np.ndarray, vw: int, vh: int, f: float) -> np.nda
         f (float): The focal length of the camera.
     Returns:
         numpy.ndarray: An array of shape (N, 3) containing the rays in 3D space,
-                       where N is the number of projected points.
+                      where N is the number of projected points.
     """
-    
     # Pinhole Camera Model:
-    # ray = (projected_x - viewport_width ÷ 2, projected_y - viewport_height ÷ 2, focal_length)
-    # In this case i'm flipping the y & z axis for a right-handed coordinate system.
-    
+    # ray = (projected_x - viewport_width / 2, -(projected_y - viewport_height / 2), -f)
+    # Flipping y & z axis for a right-handed coordinate system.
     projected_points = np.asarray(projected_points)
     rays = np.empty((projected_points.shape[0], 3))
     rays[:, 0] = projected_points[:, 0] - vw / 2
@@ -80,34 +78,24 @@ def compute_ts(r1: np.ndarray, r2: np.ndarray, r3: np.ndarray, side: float) -> t
     Compute the scale factors t1, t2, t3 such that P_i = t_i * r_i
     form an equilateral triangle of side length `side`, given
     unit direction vectors r1, r2, r3 (3-element arrays).
-
     Args:
-    - r1, r2, r3: array-like, shape (3,)
-        Unit direction vectors (rays) from the camera origin.
-    - side: float
-        The desired length of each side of the equilateral triangle.
-
+        r1, r2, r3 (np.ndarray): Unit direction vectors (rays) from the camera origin.
+        side (float): The desired length of each side of the equilateral triangle.
     Returns:
-    numpy.ndarray: An array of shape (3,) containing the scale factors t1, t2, t3.
+        numpy.ndarray: An array of shape (3,) containing the scale factors t1, t2, t3.
     """
-
     # Compute dot products
     c12 = np.dot(r1, r2)
     c23 = np.dot(r2, r3)
     c13 = np.dot(r1, r3)
-
     u12, u23, u13 = 1 - c12, 1 - c23, 1 - c13
-
     sqrt_d = np.sqrt(2.0 * u12 * u23 * u13)
-
     return side * np.array((u23, u13, u12)) / sqrt_d
+
 
 def get_orientation(b1: np.ndarray, b2: np.ndarray, b3: np.ndarray) -> tuple:
     """
-    Calculate the orientation of the triangle formed by three points in 3D space where:
-    - b1, b2, and b3 form an equilateral triangle.
-    - b1 is in the top position.
-    - the line formed by b2 and b3 is parallel to the horizontal plane.
+    Calculate the orientation of the triangle formed by three points in 3D space.
     Args:
         b1, b2, b3 (numpy.ndarray): The 3D coordinates of the points.
     Returns:
@@ -118,7 +106,8 @@ def get_orientation(b1: np.ndarray, b2: np.ndarray, b3: np.ndarray) -> tuple:
     y_axis = normalize(np.cross(z_axis, x_axis))
     return x_axis, y_axis, z_axis
 
-def orient_pos(pos, x_axis, y_axis, z_axis):
+
+def orient_pos(pos: np.ndarray, x_axis: np.ndarray, y_axis: np.ndarray, z_axis: np.ndarray) -> np.ndarray:
     """
     Orient a position vector to the triangle's orientation defined by its axes.
     Args:

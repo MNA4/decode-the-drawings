@@ -12,7 +12,7 @@ def get_all_balls(frame_array: np.ndarray, inv_threshold: float) -> tuple:
     """
     pos = np.empty([3, 2])
     radius = np.empty([3])
-    sum_ = np.sum(frame_array, axis=2) * inv_threshold
+    sum_ = np.sum(frame_array, axis=2) * inv_threshold * 0.3333
     for i in range(3):
         threshold_array = frame_array[:, :, i] > sum_
 
