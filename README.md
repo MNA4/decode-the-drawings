@@ -202,13 +202,13 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-1. Place your input video (e.g., `3.mp4`) in the project directory.
+1. Place your input video (e.g., `3.mp4`) in `./videos`.
 2. Adjust configuration parameters in `script.py` if needed (e.g., `VIDEO_PATH`, `PIXEL_THRESHOLD`, etc).
 3. Run the main script:
 ```
 python script.py
 ```
-4. The UI will display the video, detected balls, and drawing. Pen tip coordinates are saved to `pixels.txt` when the video ends.
+4. The UI will display the video, detected balls, the world's axis, and the drawing. Pen tip coordinates are saved to `pixels.txt` when the video ends.
 
 ## File Overview
 - `script.py` — Main application logic and UI
