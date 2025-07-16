@@ -169,9 +169,13 @@ we can use the following formula to convert the pen tip coordinates from the cam
 > source: https://en.wikipedia.org/wiki/Euclidean_vector#Conversion_between_multiple_Cartesian_bases
 
 $$
-x' = \text{x axis} \cdot x, \\
-y' = \text{y axis} \cdot y, \\
-z' = \text{z axis} \cdot z.
+x' = \text{x axis} \cdot x
+$$
+$$
+y' = \text{y axis} \cdot y
+$$
+$$
+z' = \text{z axis} \cdot z
 $$
 
 where $x$, $y$, and $z$ are the pen tip coordinates in the camera's coordinate system, and $x'$, $y'$, and $z'$ are the pen tip coordinates in the world's coordinate system.
