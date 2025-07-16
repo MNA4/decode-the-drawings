@@ -144,8 +144,8 @@ We can solve these equations for $t_1$, $t_2$, and $t_3$, and obtain the followi
 
 $$
 \begin{aligned}
-t_1 &= \frac{s\,(1 - r_2\cdot r_3)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}},\\[6pt]
-t_2 &= \frac{s\,(1 - r_1\cdot r_3)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}},\\[6pt]
+t_1 &= \frac{s\,(1 - r_2\cdot r_3)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}},\\
+t_2 &= \frac{s\,(1 - r_1\cdot r_3)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}},\\
 t_3 &= \frac{s\,(1 - r_1\cdot r_2)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}}.
 \end{aligned}
 $$
@@ -169,9 +169,9 @@ we can use the following formula to convert the pen tip coordinates from the cam
 > source: https://en.wikipedia.org/wiki/Euclidean_vector#Conversion_between_multiple_Cartesian_bases
 > 
 > $$
-> x' = \text{x\_axis} \cdot x \\
-> y' = \text{y\_axis} \cdot y \\
-> z' = \text{z\_axis} \cdot z \\
+> x' = \text{x axis} \cdot x \\
+> y' = \text{y axis} \cdot y \\
+> z' = \text{z axis} \cdot z \\
 > $$
 
 where `x`, `y`, and `z` are the pen tip coordinates in the camera's coordinate system, and `x'`, `y'`, and `z'` are the pen tip coordinates in the world's coordinate system.
