@@ -89,11 +89,9 @@ I used the average distance between the balls to calculate the camera's focal le
 This allows the program to construct a pinhole camera model, which is essential for accurately estimating the 3D positions of the balls.
 The focal length is calculated using the formula:
 
-> source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
-> 
-> $$
-> \text{focal\_length} = \frac{\text{projected\_length} \times z}{\text{actual\_length}}
-> $$
+source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
+
+$$\text{focal\_length} = \frac{\text{projected\_length} \times z}{\text{actual\_length}}$$
 
 where `projected_length` is the distance between the projected centers of the balls in the image frame, `z` is the estimated z-value from the camera to the balls, and `actual_length` is the actual distance between the balls in the real world.
 
@@ -114,10 +112,8 @@ for most cameras, the principal point is at the center of the image, so `princip
 This project uses 2 different methods to estimate the distance between the camera and each ball:
 
 #### Method 1: Using the projected radius of the ball in the image frame.
-> source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
-> $$
-> z_i = \frac{\text{focal\_length} \times \text{actual\_radius}}{\text{projected\_radius}}
-> $$
+(source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation)
+$$z_i = \frac{\text{focal\_length} \times \text{actual\_radius}}{\text{projected\_radius}}$$
 
 where `focal_length` is the focal length calculated in step 4.1, `actual_radius` is the real-world radius of the ball, and `projected_radius` is the radius of the ball in the image frame.
 
@@ -129,23 +125,11 @@ position[i] = ray[i] * (z[i] / ray[i].z)
 
 Suppose we have three rays $r_1$, $r_2$, and $r_3$ pointing to the centers of the three balls, distances $t_1$, $t_2$, and $t_3$ such that $r_i t_i$ gives the position of ball $i$ in the camera's coordinate system, and we have the angles $\theta_{12}$, $\theta_{23}$, and $\theta_{31}$ between the rays. We then obtain the following symmetric equations:
 
-$$
-\begin{align*}
-t_1^2 + t_2^2 - 2 t_1 t_2 \cos\left(\theta_{12}\right) &= s^2 \\
-t_2^2 + t_3^2 - 2 t_2 t_3 \cos\left(\theta_{23}\right) &= s^2 \\
-t_3^2 + t_1^2 - 2 t_3 t_1 \cos\left(\theta_{31}\right) &= s^2
-\end{align*}
-$$
+$$\begin{align*}t_1^2 + t_2^2 - 2 t_1 t_2 \cos\left(\theta_{12}\right) &= s^2 \\t_2^2 + t_3^2 - 2 t_2 t_3 \cos\left(\theta_{23}\right) &= s^2 \\ t_3^2 + t_1^2 - 2 t_3 t_1 \cos\left(\theta_{31}\right) &= s^2\end{align*}$$
 where $s$ is the distance between each pair of balls in the real world.
 
 We can solve these equations for $t_1$, $t_2$, and $t_3$, and obtain the following results:
-$$
-\begin{aligned}
-t_1 &= \frac{s\,(1 - r_2\cdot r_3)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}},\\[6pt]
-t_2 &= \frac{s\,(1 - r_1\cdot r_3)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}},\\[6pt]
-t_3 &= \frac{s\,(1 - r_1\cdot r_2)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}}.
-\end{aligned}
-$$
+$$\begin{aligned}t_1 &= \frac{s\,(1 - r_2\cdot r_3)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}},\\t_2 &= \frac{s\,(1 - r_1\cdot r_3)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}},\\t_3 &= \frac{s\,(1 - r_1\cdot r_2)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}}.\end{aligned}$$
 we can find the real world position of each ball by multiplying the ray by the distance:
 ```
 position[i] = ray[i] * t[i]
@@ -162,12 +146,8 @@ Finally, we can compute the y-axis direction by crossing the z-axis with the x-a
 
 ### Step 5.6: Convert Pen Tip Coordinates to World Coordinate System
 we can use the following formula to convert the pen tip coordinates from the camera's coordinate system to the world's coordinate system:
-> source: https://en.wikipedia.org/wiki/Euclidean_vector#Conversion_between_multiple_Cartesian_bases
-> $$
-> x' = \text{x\_axis} \cdot x \\
-> y' = \text{y\_axis} \cdot y \\
-> z' = \text{z\_axis} \cdot z \\
-> $$
+source: https://en.wikipedia.org/wiki/Euclidean_vector#Conversion_between_multiple_Cartesian_bases
+$$x' = \text{x\_axis} \cdot x \\y' = \text{y\_axis} \cdot y \\z' = \text{z\_axis} \cdot z \\$$
 
 where `x`, `y`, and `z` are the pen tip coordinates in the camera's coordinate system, and `x'`, `y'`, and `z'` are the pen tip coordinates in the world's coordinate system.
 
