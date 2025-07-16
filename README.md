@@ -69,7 +69,7 @@ However, we can optimize this further since `r + g + b` and `threshold` doesn't 
 ```py
 inv_threshold = 1 / threshold  # precompute the inverse of the threshold
 colors = (r,g,b)
-avg = sum(colors) * inv_threshold / 0.33333  # precompute the average color value
+avg = sum(colors) * inv_threshold * 0.33333  # precompute the average color value
 for i, color in enumerate(colors):
     if color > avg:
         # this pixel is considered a color ball pixel
