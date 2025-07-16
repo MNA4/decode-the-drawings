@@ -174,11 +174,6 @@ poetry.toml
 pyrightconfig.json
 
 # Video files
-1.mp4
-2.mp4
-3.mp4
-4.mp4
-5.mp4
-6.mp4
+videos/
 # End of https://www.toptal.com/developers/gitignore/api/python
 

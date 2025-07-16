@@ -19,7 +19,7 @@ from ball_vectors import calibrate_focal_length, get_rays, compute_ts, get_orien
 # Configuration
 # ----------------------
 IGNORE_BALL_RADIUS = False  # If True, use the law of cosines; else, estimate from video
-VIDEO_PATH = "3.mp4"        # Path to input video
+VIDEO_PATH = "videos/3.mp4"        # Path to input video
 OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
 PADDING = 10                # Padding for UI widgets
 FPS = 60                    # Target frames per second

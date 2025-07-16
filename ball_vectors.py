@@ -62,7 +62,8 @@ def get_rays(projected_points: np.ndarray, vw: int, vh: int, f: float) -> np.nda
     """
     # Pinhole Camera Model:
     # ray = (projected_x - viewport_width / 2, -(projected_y - viewport_height / 2), -f)
-    # Flipping y & z axis for a right-handed coordinate system.
+    # The Y axis is flipped for a right-handed coordinate system.
+    # The Z axis is flipped, since the camera is pointing onto the scene.
     projected_points = np.asarray(projected_points)
     rays = np.empty((projected_points.shape[0], 3))
     rays[:, 0] = projected_points[:, 0] - vw / 2
@@ -107,7 +108,10 @@ def get_orientation(b1: np.ndarray, b2: np.ndarray, b3: np.ndarray) -> tuple:
     return x_axis, y_axis, z_axis
 
 
-def orient_pos(pos: np.ndarray, x_axis: np.ndarray, y_axis: np.ndarray, z_axis: np.ndarray) -> np.ndarray:
+def orient_pos(pos: np.ndarray,
+               x_axis: np.ndarray,
+               y_axis: np.ndarray,
+               z_axis: np.ndarray) -> np.ndarray:
     """
     Orient a position vector to the triangle's orientation defined by its axes.
     Args:
