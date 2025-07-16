@@ -129,7 +129,7 @@ position[i] = ray[i] * (z[i] / ray[i].z)
 ```
 #### Method 2: using law of cosines to calculate the distance between the camera and each ball based on the angles between the rays pointing to each ball.
 
-Suppose we have three rays $r_1$, $r_2$, and $r_3$ pointing to the centers of the three balls, distances $t_1$, $t_2$, and $t_3$ such that $r_i t_i$ gives the position of ball $i$ in the camera's coordinate system, and we have the angles $\theta_{12}$, $\theta_{23}$, and $\theta_{31}$ between the rays. We then obtain the following symmetric equations:
+Suppose we have three rays $r_1$, $r_2$, and $r_3$ pointing to the centers of the three balls, distances $t_1$, $t_2$, and $t_3$ such that $r_i t_i$ gives the position of ball $i$ in the camera's coordinate system, and angles $\theta_{12}$, $\theta_{23}$, and $\theta_{31}$ where $\theta_{ij}$ is the angle between rays $r_i$ and $r_j$. We then obtain the following symmetric equations:
 
 $$
 \begin{align*}
