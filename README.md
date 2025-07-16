@@ -90,12 +90,12 @@ This allows the program to construct a pinhole camera model, which is essential 
 The focal length is calculated using the formula:
 
 > source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
-> 
-> $$
-> \text{focal length} = \frac{\text{projected length} \times z}{\text{actual length}}
-> $$
 
-where `projected length` is the distance between the projected centers of the balls in the image frame, `z` is the estimated z-value from the camera to the balls, and `actual length` is the actual distance between the balls in the real world.
+$$
+\text{focal length} = \frac{\text{projected length} \times z}{\text{actual length}}
+$$
+
+where $\text{projected length}$ is the distance between the projected centers of the balls in the image frame, $z$ is the estimated z-value from the camera to the balls, and $\text{actual length}$ is the actual distance between the balls in the real world.
 
 ### Step 5.1: Ball Position Estimation
 Here, I used the pinhole camera model to get the rays that point to the center of each ball. The rays are calculated using the formula:
@@ -115,12 +115,12 @@ This project uses 2 different methods to estimate the distance between the camer
 
 #### Method 1: Using the projected radius of the ball in the image frame.
 > source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
-> 
-> $$
-> z_i = \frac{\text{focal length} \times \text{actual radius}}{\text{projected radius}}
-> $$
 
-where `focal length` is the focal length calculated in step 4.1, `actual radius` is the real-world radius of the ball, and `projected radius` is the radius of the ball in the image frame.
+$$
+z_i = \frac{\text{focal length} \times \text{actual radius}}{\text{projected radius}}
+$$
+
+where $\text{focal length}$ is the focal length calculated in step 4.1, $\text{actual radius}$ is the real-world radius of the ball, and $\text{projected radius}$ is the radius of the ball in the image frame.
 
 we can find the real world position of each ball by multiplying the ray by the z_i divided by the ray's z value:
 ```
@@ -167,16 +167,12 @@ Finally, we can compute the y-axis direction by crossing the z-axis with the x-a
 ### Step 5.6: Convert Pen Tip Coordinates to World Coordinate System
 we can use the following formula to convert the pen tip coordinates from the camera's coordinate system to the world's coordinate system:
 > source: https://en.wikipedia.org/wiki/Euclidean_vector#Conversion_between_multiple_Cartesian_bases
-> 
-> $$
-> x' = \text{x axis} \cdot x
-> $$
-> $$
-> y' = \text{y axis} \cdot y
-> $$
-> $$
-> z' = \text{z axis} \cdot z
-> $$
+
+$$
+x' = \text{x axis} \cdot x \\
+y' = \text{y axis} \cdot y \\
+z' = \text{z axis} \cdot z
+$$
 
 where $x$, $y$, and $z$ are the pen tip coordinates in the camera's coordinate system, and $x'$, $y'$, and $z'$ are the pen tip coordinates in the world's coordinate system.
 
