@@ -19,12 +19,14 @@ from ball_vectors import calibrate_focal_length, get_rays, compute_ts, get_orien
 # Configuration
 # ----------------------
 IGNORE_BALL_RADIUS = False  # If True, use the law of cosines; else, estimate from video
+IGNORE_AUDIO = False  # If True, use pen-y coordinate to detect pen-down; else, use audio intensity
 VIDEO_PATH = "videos/3.mp4"        # Path to input video
 OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
 PADDING = 10                # Padding for UI widgets
 FPS = 60                    # Target frames per second
 PIXEL_THRESHOLD = 80        # Threshold for ball detection (in percent)
 AUDIO_THRESHOLD = 0.0013    # Threshold for pen-down audio detection
+PEN_THRESHOLD = 1           # Threshold for pen tip y-coordinate to consider it touching the paper
 INITIAL_Z = 18              # Initial Z distance (cm) for calibration
 PEN_LENGTH = 18             # Length of the pen (cm)
 INITIAL_DST = 9             # Initial distance between balls (cm)
@@ -88,7 +90,13 @@ while STATUS != "quit":
             save_pixels(pixels, OUTPUT_FILENAME)
             STATUS = "saving"
             continue
-
+        
+        if not IGNORE_AUDIO:
+            # Detect pen-down event using audio
+            aud_intensity = audio_intensity(aud_array)
+            if aud_intensity <= AUDIO_THRESHOLD:
+                continue  # Skip frame if audio intensity is below threshold
+            
         # Detect balls in current frame
         ball_projected_pos, ball_projected_radius = get_all_balls(
             frame_array, INV_THRESHOLD
@@ -118,10 +126,10 @@ while STATUS != "quit":
         # Transform pen tip to triangle's local coordinate system
         pen_tip = orient_pos(non_oriented_pen_tip, x_axis, y_axis, z_axis)
 
-        # Detect pen-down event using audio
-        aud_intensity = audio_intensity(aud_array)
-        if aud_intensity > AUDIO_THRESHOLD:
-            pixels.append((pen_tip[0], pen_tip[2]))
+        if IGNORE_AUDIO:
+            if pen_tip[1] >= -PEN_LENGTH + PEN_THRESHOLD:
+                continue
+        pixels.append((pen_tip[0], pen_tip[2]))
 
         # Update UI widgets
         axis_widget.set_axes(x_axis, y_axis, z_axis)

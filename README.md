@@ -184,7 +184,7 @@ where $x$, $y$, and $z$ are the pen tip coordinates in the camera's coordinate s
 ### Step 5.7: Check if the Pen is Touching the Paper
 This project uses 2 different methods to check if the pen is touching the paper:
 #### Method 1: Using the Pen Length
-If the pen tip's y-coordinate in the world's coordinate system is less than or equal to the negative of the pen length, then the pen is touching the paper. This is a simple check that works well for most cases.
+If the pen tip's y-coordinate in the world's coordinate system is less than or equal to the negative of the pen length (plus a threshold), then the pen is touching the paper. This is a simple check that works well for most cases.
 #### Method 2: Using audio intensity
 If the audio intensity is above a certain threshold, then the pen is touching the paper. This method is more robust, as it can detect the pen touching the paper even if the pen tip's y-coordinate is above the negative of the pen length. The audio intensity is calculated using the following formula:
 ```
