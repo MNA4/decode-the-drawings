@@ -208,7 +208,7 @@ pip install -r requirements.txt
 ```
 python script.py
 ```
-4. The UI will display the video, detected balls, the world's axis, and the drawing. Pen tip coordinates are saved to `pixels.txt` when the video ends.
+4. The UI will display the video, detected balls, the world's axes, and the drawing. Pen tip coordinates are saved to `pixels.txt` when the video ends. however, you can change the output file name in `script.py` by changing the `OUTPUT_FILE` variable.
 
 ## File Overview
 - `script.py` — Main application logic and UI
