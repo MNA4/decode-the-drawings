@@ -53,7 +53,7 @@ To separate the ball pixels from the background, I apply color thresholding usin
 ```py
 # threshold value is between 0 and 1
 
-# in this case we're thresholding the red value
+# thresholding the red value
 if (r * threshold > (r + g + b) / 3):
     # this pixel is considered a red ball pixel
 # thresholding the green value
