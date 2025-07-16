@@ -64,7 +64,7 @@ if (b * threshold > (r + g + b) / 3):
     # this pixel is considered a blue ball pixel
 ```
 
-However, we can optimize this further since `r + g + b` and `threshold` doesn't change for every pixel. We can precompute these values and use them in the thresholding checks.
+However, we can optimize this since `r + g + b` and `threshold` value doesn't change for each pixel. We can precompute these values and use them in the thresholding checks:
 
 ```py
 inv_threshold = 1 / threshold  # precompute the inverse of the threshold
@@ -79,14 +79,15 @@ for i, color in enumerate(colors):
 Instead of looping through each pixel and checking the threshold, this project uses numpy's vectorized operations to apply the thresholding in one go. This significantly speeds up the processing time.
 
 ### Step 3: Calculate Projected Center Positions and Radii
-After thresholding, I calculate the center position and radius of each ball in the image frame. 
+After thresholding, we calculate the projected center position and radius of each ball in the image frame. 
 For now, we just use the center of mass of the detected pixels as the center position, and the radius is computed using the area of the detected pixels.
 
 However, this can be improved by using a more robust method like fitting an ellipse to the detected pixels.
 
 ### Step 4.1: Camera Calibration
-I used the average distance between the balls to calculate the camera's focal length. This is done by comparing the projected distance between each pair of balls in the image frame with their actual given distances.
+I used the average distance between the balls to calculate the camera's focal length. This is done by comparing the average projected distance between each pair of balls in the image frame with their actual given distances.
 This allows the program to construct a pinhole camera model, which is essential for accurately estimating the 3D positions of the balls.
+
 The focal length is calculated using the formula:
 
 > source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
@@ -98,7 +99,7 @@ $$
 where $\text{projected length}$ is the distance between the projected centers of the balls in the image frame, $z$ is the estimated z-value from the camera to the balls, and $\text{actual length}$ is the actual distance between the balls in the real world.
 
 ### Step 5.1: Ball Position Estimation
-Here, I used the pinhole camera model to get the rays that point to the center of each ball. The rays are calculated using the formula:
+Here, I used the pinhole camera model to compute the rays that point to the center of each ball. The rays are calculated using the formula:
 
 source: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays.html
 
