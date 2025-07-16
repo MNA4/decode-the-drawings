@@ -18,7 +18,7 @@ Note: In this project, I'm using the right handed coordinate system for the came
 
 the world's coordinate system used in this project is shown below:
 
-*Image 1: World Coordinate System*
+*Image 1: World Coordinate System (Credit to Radu for the original image)*
 
 ![Image 1: World Coordinate System](https://raw.githubusercontent.com/MNA4/decode-the-drawings/main/world_coordinate_system.png)
 
