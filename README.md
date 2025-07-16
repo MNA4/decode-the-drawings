@@ -92,10 +92,10 @@ The focal length is calculated using the formula:
 > source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
 > 
 > $$
-> \text{focal\_length} = \frac{\text{projected\_length} \times z}{\text{actual\_length}}
+> \text{focal length} = \frac{\text{projected length} \times z}{\text{actual length}}
 > $$
 
-where `projected_length` is the distance between the projected centers of the balls in the image frame, `z` is the estimated z-value from the camera to the balls, and `actual_length` is the actual distance between the balls in the real world.
+where `projected length` is the distance between the projected centers of the balls in the image frame, `z` is the estimated z-value from the camera to the balls, and `actual length` is the actual distance between the balls in the real world.
 
 ### Step 5.1: Ball Position Estimation
 Here, I used the pinhole camera model to get the rays that point to the center of each ball. The rays are calculated using the formula:
@@ -115,11 +115,12 @@ This project uses 2 different methods to estimate the distance between the camer
 
 #### Method 1: Using the projected radius of the ball in the image frame.
 > source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
+> 
 > $$
-> z_i = \frac{\text{focal\_length} \times \text{actual\_radius}}{\text{projected\_radius}}
+> z_i = \frac{\text{focal length} \times \text{actual radius}}{\text{projected radius}}
 > $$
 
-where `focal_length` is the focal length calculated in step 4.1, `actual_radius` is the real-world radius of the ball, and `projected_radius` is the radius of the ball in the image frame.
+where `focal length` is the focal length calculated in step 4.1, `actual radius` is the real-world radius of the ball, and `projected radius` is the radius of the ball in the image frame.
 
 we can find the real world position of each ball by multiplying the ray by the z_i divided by the ray's z value:
 ```
@@ -136,9 +137,11 @@ t_2^2 + t_3^2 - 2 t_2 t_3 \cos\left(\theta_{23}\right) &= s^2 \\
 t_3^2 + t_1^2 - 2 t_3 t_1 \cos\left(\theta_{31}\right) &= s^2
 \end{align*}
 $$
+
 where $s$ is the distance between each pair of balls in the real world.
 
 We can solve these equations for $t_1$, $t_2$, and $t_3$, and obtain the following results:
+
 $$
 \begin{aligned}
 t_1 &= \frac{s\,(1 - r_2\cdot r_3)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}},\\[6pt]
@@ -146,6 +149,7 @@ t_2 &= \frac{s\,(1 - r_1\cdot r_3)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot
 t_3 &= \frac{s\,(1 - r_1\cdot r_2)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot r_3)\,(1 - r_3\cdot r_1)\,}}.
 \end{aligned}
 $$
+
 we can find the real world position of each ball by multiplying the ray by the distance:
 ```
 position[i] = ray[i] * t[i]
@@ -163,6 +167,7 @@ Finally, we can compute the y-axis direction by crossing the z-axis with the x-a
 ### Step 5.6: Convert Pen Tip Coordinates to World Coordinate System
 we can use the following formula to convert the pen tip coordinates from the camera's coordinate system to the world's coordinate system:
 > source: https://en.wikipedia.org/wiki/Euclidean_vector#Conversion_between_multiple_Cartesian_bases
+> 
 > $$
 > x' = \text{x\_axis} \cdot x \\
 > y' = \text{y\_axis} \cdot y \\
