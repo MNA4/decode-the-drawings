@@ -222,6 +222,10 @@ python script.py
 - No OpenCV is required; all image processing is done with numpy and pygame.
 - For best results, use a video with clear, well-separated colored balls and minimal background clutter.
 
+## TODO
+- [ ] Improve ball detection using more robust methods (e.g., ellipse fitting).
+- [ ] Allow user to change parameters via UI.
+- [ ] Use neural network to correct error in pen tip coordinates.
 ## License
 Copyright (c) 2025 https://github.com/MNA4
 

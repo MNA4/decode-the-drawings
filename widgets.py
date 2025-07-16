@@ -1,6 +1,6 @@
 """
 widgets.py
-Custom UI toolkit for pygame, including Root container, BaseWidget, and various widget types (Label, Button, Slider, RadioButtons, Checkboxes, TitledWidget, SettingsWidget, AxisWidget, ImageWidget).
+Custom UI toolkit for pygame.
 """
 
 import pygame as pg
@@ -9,15 +9,17 @@ import numpy as np
 pg.init()
 pg.font.init()
 
+
 class Root:
     """
     Root container for all widgets. Manages layout, event processing, and rendering.
     """
+
     def __repr__(self):
         string_repr = self.__class__.__name__
         for attr in self.__dict__:
             string_repr += f" {attr}={getattr(self, attr)}"
-        return '<'+string_repr+'>'
+        return "<" + string_repr + ">"
 
     def __init__(self, screen: pg.Surface, *, padding: int = 10) -> None:
         """
@@ -38,23 +40,24 @@ class Root:
             return
 
         sw, sh = self.screen.get_size()
-        max_w = max(self.children, key=lambda x:x.req_width).req_width
+        max_w = max(self.children, key=lambda x: x.req_width).req_width
         pos = [sw - max_w - self.padding, self.padding]
 
         self.child_bbox = []
-        for i,c in enumerate(self.children[:-1]):
+        for i, c in enumerate(self.children[:-1]):
 
             self.child_bbox.append(pg.Rect(pos, (c.req_width, c.req_height)))
 
             pos[1] += c.req_height + self.padding
-            if pos[1] + self.children[i+1].req_height + self.padding > sh:
+            if pos[1] + self.children[i + 1].req_height + self.padding > sh:
                 pos[1] = self.padding
                 pos[0] -= max_w + self.padding
 
-        self.child_bbox.append(pg.Rect(pos, (self.children[-1].req_width,
-                                             self.children[-1].req_height)))
+        self.child_bbox.append(
+            pg.Rect(pos, (self.children[-1].req_width, self.children[-1].req_height))
+        )
 
-        for i,c in enumerate(self.children):
+        for i, c in enumerate(self.children):
             c.bbox = self.child_bbox[i]
             c.update_layout()
 
@@ -87,22 +90,28 @@ class Root:
         else:
             self.children.append(children)
 
+
 class BaseWidget:
     """
     Base class for all widgets. Handles layout, background, and child management.
     """
+
     def __repr__(self):
         string_repr = self.__class__.__name__
         for attr in self.__dict__:
-            if attr not in ['in_bbox', 'bbox', 'parent', 'children', 'child_bbox']:
+            if attr not in ["in_bbox", "bbox", "parent", "children", "child_bbox"]:
                 string_repr += f" {attr}={getattr(self, attr)}"
-        return '<'+string_repr+'>'
+        return "<" + string_repr + ">"
 
-    def __init__(self, parent, *,
-                 background: tuple[int, int, int]=None,
-                 req_width: int=200,
-                 req_height: int=200,
-                 padding: int=None):
+    def __init__(
+        self,
+        parent,
+        *,
+        background: tuple[int, int, int] = None,
+        req_width: int = 200,
+        req_height: int = 200,
+        padding: int = None,
+    ):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param background: RGB tuple for the widget background (or None for transparent)
@@ -175,15 +184,22 @@ class BaseWidget:
         if self.parent and self in self.parent.children:
             self.parent.children.remove(self)
 
+
 class Label(BaseWidget):
     """
     A simple text label widget.
     """
-    def __init__(self, parent, font: pg.font.Font, *,
-                 text: str = "Sample Label",
-                 background: tuple[int, int, int] = None,
-                 foreground: tuple[int, int, int] = (0, 0, 0),
-                 align: str = "left"):
+
+    def __init__(
+        self,
+        parent,
+        font: pg.font.Font,
+        *,
+        text: str = "Sample Label",
+        background: tuple[int, int, int] = None,
+        foreground: tuple[int, int, int] = (0, 0, 0),
+        align: str = "left",
+    ):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param font: pygame Font object to use for rendering text
@@ -197,7 +213,7 @@ class Label(BaseWidget):
             background=background,
             req_width=None,  # Width will be determined by text
             req_height=None,  # Height will be determined by text
-            padding=0
+            padding=0,
         )
         self.font = font
         self.text = text
@@ -227,20 +243,26 @@ class Label(BaseWidget):
                 text_rect.midleft = self.bbox.midleft
             screen.blit(text_surface, text_rect)
 
+
 class Button(BaseWidget):
     """
     A simple clickable button widget.
     """
-    def __init__(self, parent, *,
-                    text: str = "Button",
-                    font: pg.font.Font = None,
-                    background: tuple[int, int, int] = (100, 100, 100),
-                    foreground: tuple[int, int, int] = (255, 255, 255),
-                    pressed_color: tuple[int, int, int] = (50, 50, 50),
-                    req_width: int = 100,
-                    req_height: int = 30,
-                    padding: int = None,
-                    on_click = None):
+
+    def __init__(
+        self,
+        parent,
+        *,
+        text: str = "Button",
+        font: pg.font.Font = None,
+        background: tuple[int, int, int] = (100, 100, 100),
+        foreground: tuple[int, int, int] = (255, 255, 255),
+        pressed_color: tuple[int, int, int] = (50, 50, 50),
+        req_width: int = 100,
+        req_height: int = 30,
+        padding: int = None,
+        on_click=None,
+    ):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param text: button label text
@@ -251,16 +273,17 @@ class Button(BaseWidget):
         :param req_width: button width
         :param req_height: button height
         :param padding: padding around label
-        :param on_click: callback function for click event, when set to None, the button will not respond to clicks
+        :param on_click: callback function for click event.
+                         when set to None, the button will not respond to clicks
         """
         super().__init__(
             parent,
             background=background,
             req_width=req_width,
             req_height=req_height,
-            padding=padding
+            padding=padding,
         )
-        self.font = font or pg.font.SysFont('consolas', 14, bold=True)
+        self.font = font or pg.font.SysFont("consolas", 14, bold=True)
         self.text = text
         self.foreground = foreground
         self.normal_color = background
@@ -275,7 +298,7 @@ class Button(BaseWidget):
             text=self.text,
             background=None,
             foreground=self.foreground,
-            align="center"
+            align="center",
         )
 
     def update_layout(self) -> None:
@@ -285,7 +308,7 @@ class Button(BaseWidget):
             self.bbox.left + pad,
             self.bbox.top + pad,
             self.bbox.width - 2 * pad,
-            self.bbox.height - 2 * pad
+            self.bbox.height - 2 * pad,
         )
 
     def process_event(self, event: pg.event.Event) -> None:
@@ -303,20 +326,26 @@ class Button(BaseWidget):
     def render(self, screen: pg.Surface) -> None:
         super().render(screen)
 
+
 class Slider(BaseWidget):
     """
     A simple horizontal slider widget.
     """
-    def __init__(self, parent, *,
-                 min_val: float = 0.0,
-                 max_val: float = 1.0,
-                 value: float = 0.5,
-                 track_height: int = 10,
-                 background: tuple[int, int, int] = None,
-                 thumb_color: tuple[int, int, int] = (50, 50, 50),
-                 track_color: tuple[int, int, int] = (100, 100, 100),
-                 req_width: int = 200,
-                 req_height: int = 20):
+
+    def __init__(
+        self,
+        parent,
+        *,
+        min_val: float = 0.0,
+        max_val: float = 1.0,
+        value: float = 0.5,
+        track_height: int = 10,
+        background: tuple[int, int, int] = None,
+        thumb_color: tuple[int, int, int] = (50, 50, 50),
+        track_color: tuple[int, int, int] = (100, 100, 100),
+        req_width: int = 200,
+        req_height: int = 20,
+    ):
         """
         :param min_val: minimum slider value
         :param max_val: maximum slider value
@@ -335,10 +364,10 @@ class Slider(BaseWidget):
         self.track_h = track_height
         self.track_color = track_color
         self.thumb_color = thumb_color
-        self.thumb_width = req_height # Thumb is square, so width == height
+        self.thumb_width = req_height  # Thumb is square, so width == height
         self.thumb_height = req_height
 
-        self.dragging = False  
+        self.dragging = False
 
     def _value_to_pos(self) -> int:
         """Convert current value to an x-coordinate for the thumb center.
@@ -397,7 +426,7 @@ class Slider(BaseWidget):
             self.bbox.left,
             self.bbox.centery - self.track_h // 2,
             self.bbox.width,
-            self.track_h
+            self.track_h,
         )
         pg.draw.rect(screen, self.track_color, track_rect)
 
@@ -408,27 +437,33 @@ class Slider(BaseWidget):
             screen,
             self.thumb_color,
             (
-            thumb_x - self.thumb_width // 2,
-            thumb_y - self.thumb_height // 2,
-            self.thumb_width,
-            self.thumb_height
-            )
+                thumb_x - self.thumb_width // 2,
+                thumb_y - self.thumb_height // 2,
+                self.thumb_width,
+                self.thumb_height,
+            ),
         )
+
 
 class RadioButtons(BaseWidget):
     """
     A simple vertical list of radio buttons using Label widgets.
     """
-    def __init__(self, parent, *,
-                 options: list[str],
-                 selected: int = -1,
-                 font: pg.font.Font = None,
-                 background: tuple[int, int, int] = None,
-                 foreground: tuple[int, int, int] = (0, 0, 0),
-                 req_width: int = 200,
-                 req_height: int = None,
-                 padding: int = None,
-                 spacing: int = 5):
+
+    def __init__(
+        self,
+        parent,
+        *,
+        options: list[str],
+        selected: int = -1,
+        font: pg.font.Font = None,
+        background: tuple[int, int, int] = None,
+        foreground: tuple[int, int, int] = (0, 0, 0),
+        req_width: int = 200,
+        req_height: int = None,
+        padding: int = None,
+        spacing: int = 5,
+    ):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param options: list of string options
@@ -446,7 +481,7 @@ class RadioButtons(BaseWidget):
             background=background,
             req_width=req_width,
             req_height=req_height,
-            padding=padding
+            padding=padding,
         )
         self.options = options
         self.selected = selected
@@ -455,17 +490,22 @@ class RadioButtons(BaseWidget):
         self.spacing = spacing
         self.circle_radius = self.font.get_height() // 2
         self.labels = [
-            Label(self,
-                  font=self.font,
-                  text=option,
-                  background=None, 
-                  foreground=self.foreground,
-                  align="left")
+            Label(
+                self,
+                font=self.font,
+                text=option,
+                background=None,
+                foreground=self.foreground,
+                align="left",
+            )
             for option in options
         ]
         # Calculate required height
-        total_height = len(options) * (self.font.get_height() + self.spacing) - \
-                       self.spacing + 2 * self.padding
+        total_height = (
+            len(options) * (self.font.get_height() + self.spacing)
+            - self.spacing
+            + 2 * self.padding
+        )
         self.req_height = total_height
 
     def update_layout(self) -> None:
@@ -475,8 +515,11 @@ class RadioButtons(BaseWidget):
             label.bbox = pg.Rect(
                 self.bbox.left + self.padding + 2 * self.circle_radius + self.spacing,
                 y,
-                self.bbox.width - 2 * self.padding - 2 * self.circle_radius - self.spacing,
-                self.font.get_height()
+                self.bbox.width
+                - 2 * self.padding
+                - 2 * self.circle_radius
+                - self.spacing,
+                self.font.get_height(),
             )
             y += self.font.get_height() + self.spacing
 
@@ -490,7 +533,7 @@ class RadioButtons(BaseWidget):
                     self.bbox.left + self.padding,
                     y,
                     self.bbox.width - 2 * self.padding,
-                    self.font.get_height()
+                    self.font.get_height(),
                 )
                 if rect.collidepoint(mx, my):
                     self.selected = i
@@ -504,27 +547,38 @@ class RadioButtons(BaseWidget):
         circle_y = self.bbox.top + self.padding + self.circle_radius
         for i in range(len(self.labels)):
             # Draw radio circle
-            pg.draw.circle(screen, self.foreground, (circle_x, circle_y), self.circle_radius, 2)
+            pg.draw.circle(
+                screen, self.foreground, (circle_x, circle_y), self.circle_radius, 2
+            )
             if i == self.selected:
-                pg.draw.circle(screen,
-                               self.foreground,
-                               (circle_x, circle_y),
-                               self.circle_radius - 4)
+                pg.draw.circle(
+                    screen,
+                    self.foreground,
+                    (circle_x, circle_y),
+                    self.circle_radius - 4,
+                )
             circle_y += self.font.get_height() + self.spacing
+
+
 class Checkboxes(BaseWidget):
     """
     A vertical list of checkmarks (checkboxes).
     """
-    def __init__(self, parent, *,
-                    options: list[str],
-                    checked: list[bool] = None,
-                    font: pg.font.Font = None,
-                    background: tuple[int, int, int] = None,
-                    foreground: tuple[int, int, int] = (0, 0, 0),
-                    req_width: int = 200,
-                    req_height: int = None,
-                    padding: int = None,
-                    spacing: int = 5):
+
+    def __init__(
+        self,
+        parent,
+        *,
+        options: list[str],
+        checked: list[bool] = None,
+        font: pg.font.Font = None,
+        background: tuple[int, int, int] = None,
+        foreground: tuple[int, int, int] = (0, 0, 0),
+        req_width: int = 200,
+        req_height: int = None,
+        padding: int = None,
+        spacing: int = 5,
+    ):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param options: list of string options
@@ -542,7 +596,7 @@ class Checkboxes(BaseWidget):
             background=background,
             req_width=req_width,
             req_height=req_height,
-            padding=padding
+            padding=padding,
         )
         self.options = options
         self.checked = checked[:] if checked is not None else [False] * len(options)
@@ -551,16 +605,21 @@ class Checkboxes(BaseWidget):
         self.spacing = spacing
         self.box_size = self.font.get_height()
         self.labels = [
-            Label(self,
-                    font=self.font,
-                    text=option,
-                    background=None,
-                    foreground=self.foreground,
-                    align="left")
+            Label(
+                self,
+                font=self.font,
+                text=option,
+                background=None,
+                foreground=self.foreground,
+                align="left",
+            )
             for option in options
         ]
-        total_height = len(options) * (self.font.get_height() + self.spacing) - \
-                        self.spacing + 2 * self.padding
+        total_height = (
+            len(options) * (self.font.get_height() + self.spacing)
+            - self.spacing
+            + 2 * self.padding
+        )
         self.req_height = total_height
 
     def update_layout(self) -> None:
@@ -570,7 +629,7 @@ class Checkboxes(BaseWidget):
                 self.bbox.left + self.padding + self.box_size + self.spacing,
                 y,
                 self.bbox.width - 2 * self.padding - self.box_size - self.spacing,
-                self.font.get_height()
+                self.font.get_height(),
             )
             y += self.font.get_height() + self.spacing
 
@@ -583,7 +642,7 @@ class Checkboxes(BaseWidget):
                     self.bbox.left + self.padding,
                     y,
                     self.bbox.width - 2 * self.padding,
-                    self.font.get_height()
+                    self.font.get_height(),
                 )
                 if rect.collidepoint(mx, my):
                     self.checked[i] = not self.checked[i]
@@ -608,21 +667,25 @@ class Checkboxes(BaseWidget):
                 pg.draw.line(screen, self.foreground, (x2, y2), (x3, y3), 2)
             box_y += self.font.get_height() + self.spacing
 
+
 class TitledWidget(BaseWidget):
     """
     A base widget with a title at the top.
     """
 
-    title_font = pg.font.SysFont('consolas', 15, bold=True)
+    title_font = pg.font.SysFont("consolas", 15, bold=True)
 
-    def __init__(self, parent,
-                 *,
-                 padding: int = None,
-                 background: tuple[int, int, int] = (255, 255, 255),
-                 foreground: tuple[int, int, int] = (0, 0, 0),
-                 req_width: int = 200,
-                 req_height: int = 200,
-                 title: str = "Sample Widget"):
+    def __init__(
+        self,
+        parent,
+        *,
+        padding: int = None,
+        background: tuple[int, int, int] = (255, 255, 255),
+        foreground: tuple[int, int, int] = (0, 0, 0),
+        req_width: int = 200,
+        req_height: int = 200,
+        title: str = "Sample Widget",
+    ):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param padding: padding around the content inside the widget
@@ -638,7 +701,7 @@ class TitledWidget(BaseWidget):
             background=background,
             req_width=req_width,
             req_height=req_height,
-            padding=padding
+            padding=padding,
         )
 
         self.foreground = foreground
@@ -650,48 +713,60 @@ class TitledWidget(BaseWidget):
             font=self.title_font,
             text=self.title,
             background=None,
-            foreground=self.foreground
+            foreground=self.foreground,
         )
 
     def update_layout(self) -> None:
-        """ Updates the layout of this widget based on its title and padding.
+        """Updates the layout of this widget based on its title and padding.
         This sets the in_bbox to the area where content should be drawn.
         """
         self.title_label.text = self.title
         if self.title:
             h = self.title_font.get_height()
-            self.in_bbox = pg.Rect(self.bbox.left + self.padding,
-                                   self.bbox.top + self.padding * 2 + h,
-                                   self.bbox.width - 2 * self.padding,
-                                   self.bbox.height - 3 * self.padding - h)
+            self.in_bbox = pg.Rect(
+                self.bbox.left + self.padding,
+                self.bbox.top + self.padding * 2 + h,
+                self.bbox.width - 2 * self.padding,
+                self.bbox.height - 3 * self.padding - h,
+            )
         else:
-            self.in_bbox = pg.Rect(self.bbox.left + self.padding,
-                                   self.bbox.top + self.padding,
-                                   self.bbox.width - 2 * self.padding,
-                                   self.bbox.height - 2 * self.padding)
-            
+            self.in_bbox = pg.Rect(
+                self.bbox.left + self.padding,
+                self.bbox.top + self.padding,
+                self.bbox.width - 2 * self.padding,
+                self.bbox.height - 2 * self.padding,
+            )
+
         super().update_layout()
-            
+
 
 class SettingsWidget(TitledWidget):
     """
     A widget for displaying and adjusting settings.
     """
-    settings_font = pg.font.SysFont('consolas', 12, bold=True)
-    settings_label_font = pg.font.SysFont('consolas', 12, bold=False)
-    def __init__(self, parent, *,
-                 padding: int = None,
-                 background: tuple[int, int, int] = (255, 255, 255),
-                 foreground: tuple[int, int, int] = (0, 0, 0),
-                 req_width: int = 200,
-                 attributes=(
-                     {"type": "slider",
-                      "min": 0.0, 
-                      "max": 100.0, 
-                      "value": 50.0, 
-                      "name": "Sample Slider"},
-                      ),
-                 title="Settings"):
+
+    settings_font = pg.font.SysFont("consolas", 12, bold=True)
+    settings_label_font = pg.font.SysFont("consolas", 12, bold=False)
+
+    def __init__(
+        self,
+        parent,
+        *,
+        padding: int = None,
+        background: tuple[int, int, int] = (255, 255, 255),
+        foreground: tuple[int, int, int] = (0, 0, 0),
+        req_width: int = 200,
+        attributes=(
+            {
+                "type": "slider",
+                "min": 0.0,
+                "max": 100.0,
+                "value": 50.0,
+                "name": "Sample Slider",
+            },
+        ),
+        title="Settings",
+    ):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param padding: padding around the content inside the widget
@@ -701,7 +776,7 @@ class SettingsWidget(TitledWidget):
         :param req_height: the desired height of this widget
         :param attributes: a list of dictionaries describing the settings to display
         :param title: the title text to display at the top of the widget
-        
+
         Each dictionary should have a "type" key with one of the following values:
         - "slider": for a slider, with keys "min", "max", "value", and optionally "name"
         - "radio": for a radio button group, with keys "options", "selected", and optionally "name"
@@ -714,7 +789,7 @@ class SettingsWidget(TitledWidget):
             foreground=foreground,
             req_width=req_width,
             req_height=None,  # Height will be determined by content
-            title=title
+            title=title,
         )
         self.settings_widgets = []
         self.req_height = self.title_font.get_height()
@@ -726,7 +801,7 @@ class SettingsWidget(TitledWidget):
                     font=self.settings_font,
                     text=attr.get("name", "Unnamed Slider"),
                     background=None,
-                    foreground=self.foreground
+                    foreground=self.foreground,
                 )
                 min_label = Label(
                     self,
@@ -734,7 +809,7 @@ class SettingsWidget(TitledWidget):
                     text=str(attr["min"]),
                     background=None,
                     foreground=self.foreground,
-                    align="left"
+                    align="left",
                 )
                 value_label = Label(
                     self,
@@ -742,7 +817,7 @@ class SettingsWidget(TitledWidget):
                     text=str(attr["value"]),
                     background=None,
                     foreground=self.foreground,
-                    align="center"
+                    align="center",
                 )
                 max_label = Label(
                     self,
@@ -750,29 +825,34 @@ class SettingsWidget(TitledWidget):
                     text=str(attr["max"]),
                     background=None,
                     foreground=self.foreground,
-                    align="right"
+                    align="right",
                 )
-                slider = Slider(self,
-                            min_val=attr["min"],
-                            max_val=attr["max"],
-                            value=attr["value"])
-                self.req_height += label.req_height + value_label.req_height \
-                                + slider.req_height + self.padding * 4
-                self.settings_widgets.append({
-                    "type": "slider",
-                    "label": label,
-                    "slider": slider,
-                    "min_label": min_label,
-                    "value_label": value_label,
-                    "max_label": max_label
-                })
+                slider = Slider(
+                    self, min_val=attr["min"], max_val=attr["max"], value=attr["value"]
+                )
+                self.req_height += (
+                    label.req_height
+                    + value_label.req_height
+                    + slider.req_height
+                    + self.padding * 4
+                )
+                self.settings_widgets.append(
+                    {
+                        "type": "slider",
+                        "label": label,
+                        "slider": slider,
+                        "min_label": min_label,
+                        "value_label": value_label,
+                        "max_label": max_label,
+                    }
+                )
             elif attr["type"] == "radio":
                 label = Label(
                     self,
                     font=self.settings_font,
                     text=attr.get("name", "Unnamed Radio"),
                     background=None,
-                    foreground=self.foreground
+                    foreground=self.foreground,
                 )
                 radio = RadioButtons(
                     self,
@@ -782,21 +862,21 @@ class SettingsWidget(TitledWidget):
                     background=None,
                     foreground=self.foreground,
                     req_width=req_width - 2 * self.padding,
-                    padding=0
+                    padding=0,
                 )
-                self.req_height += label.req_height + radio.req_height + 2 * self.padding
-                self.settings_widgets.append({
-                    "type": "radio",
-                    "label": label,
-                    "radio": radio
-                })
+                self.req_height += (
+                    label.req_height + radio.req_height + 2 * self.padding
+                )
+                self.settings_widgets.append(
+                    {"type": "radio", "label": label, "radio": radio}
+                )
             elif attr["type"] == "checkmark":
                 label = Label(
                     self,
                     font=self.settings_font,
                     text=attr.get("name", "Unnamed Checkmark"),
                     background=None,
-                    foreground=self.foreground
+                    foreground=self.foreground,
                 )
                 checkboxes = Checkboxes(
                     self,
@@ -806,35 +886,34 @@ class SettingsWidget(TitledWidget):
                     background=None,
                     foreground=self.foreground,
                     req_width=req_width - 2 * self.padding,
-                    padding=0
+                    padding=0,
                 )
-                self.req_height += label.req_height + checkboxes.req_height + 2 * self.padding
-                self.settings_widgets.append({
-                    "type": "checkmark",
-                    "label": label,
-                    "checkmarks": checkboxes
-                })
+                self.req_height += (
+                    label.req_height + checkboxes.req_height + 2 * self.padding
+                )
+                self.settings_widgets.append(
+                    {"type": "checkmark", "label": label, "checkmarks": checkboxes}
+                )
             elif attr["type"] == "button":
                 button = Button(
                     self,
                     text=attr.get("name", "Button"),
                     on_click=attr.get("onclick"),
-                    req_width=req_width - 2 * self.padding if self.padding else req_width
+                    req_width=(
+                        req_width - 2 * self.padding if self.padding else req_width
+                    ),
                 )
                 self.req_height += button.req_height + self.padding
-                self.settings_widgets.append({
-                    "type": "button",
-                    "button": button
-                })
+                self.settings_widgets.append({"type": "button", "button": button})
 
     def update_layout(self) -> None:
-        """ Updates the layout of this widget based on its title and padding.
+        """Updates the layout of this widget based on its title and padding.
         This sets the in_bbox to the area where content should be drawn.
         """
         super().update_layout()
 
         y = self.in_bbox.top
-        for s,a in zip(self.settings_widgets, self.attributes):
+        for s, a in zip(self.settings_widgets, self.attributes):
             if s["type"] == "slider":
                 s["slider"].min = a["min"]
                 s["slider"].max = a["max"]
@@ -845,15 +924,12 @@ class SettingsWidget(TitledWidget):
                 s["value_label"].text = f"{a['value']:.2f}"
                 for c in s["label"], s["value_label"], s["slider"]:
                     bbox = pg.Rect(
-                        self.in_bbox.left,
-                        y,
-                        self.in_bbox.width,
-                        c.req_height
+                        self.in_bbox.left, y, self.in_bbox.width, c.req_height
                     )
                     if c == s["value_label"]:
-                        s["value_label"].bbox = \
-                        s["min_label"].bbox = \
-                        s["max_label"].bbox = bbox
+                        s["value_label"].bbox = s["min_label"].bbox = s[
+                            "max_label"
+                        ].bbox = bbox
                     else:
                         c.bbox = bbox
                     y += c.req_height + self.padding
@@ -879,7 +955,7 @@ class SettingsWidget(TitledWidget):
                             text=new_options[i],
                             background=None,
                             foreground=s["radio"].foreground,
-                            align="left"
+                            align="left",
                         )
                         s["radio"].labels.append(label)
                 # Update label texts for all options
@@ -890,18 +966,12 @@ class SettingsWidget(TitledWidget):
                 s["label"].text = a.get("name", "Unnamed Radio")
                 # Place label
                 s["label"].bbox = pg.Rect(
-                    self.in_bbox.left,
-                    y,
-                    self.in_bbox.width,
-                    s["label"].req_height
+                    self.in_bbox.left, y, self.in_bbox.width, s["label"].req_height
                 )
                 y += s["label"].req_height + self.padding
                 # Place radio group
                 s["radio"].bbox = pg.Rect(
-                    self.in_bbox.left,
-                    y,
-                    self.in_bbox.width,
-                    s["radio"].req_height
+                    self.in_bbox.left, y, self.in_bbox.width, s["radio"].req_height
                 )
                 s["radio"].update_layout()
                 y += s["radio"].req_height + self.padding
@@ -927,7 +997,7 @@ class SettingsWidget(TitledWidget):
                             text=new_options[i],
                             background=None,
                             foreground=s["checkmarks"].foreground,
-                            align="left"
+                            align="left",
                         )
                         s["checkmarks"].labels.append(label)
                 # Update label texts for all options
@@ -937,29 +1007,20 @@ class SettingsWidget(TitledWidget):
                 s["checkmarks"].checked = new_checked[:]
                 # Place label
                 s["label"].bbox = pg.Rect(
-                    self.in_bbox.left,
-                    y,
-                    self.in_bbox.width,
-                    s["label"].req_height
+                    self.in_bbox.left, y, self.in_bbox.width, s["label"].req_height
                 )
                 y += s["label"].req_height + self.padding
                 # Place checkmarks group
                 s["checkmarks"].bbox = pg.Rect(
-                    self.in_bbox.left,
-                    y,
-                    self.in_bbox.width,
-                    s["checkmarks"].req_height
+                    self.in_bbox.left, y, self.in_bbox.width, s["checkmarks"].req_height
                 )
                 s["checkmarks"].update_layout()
                 y += s["checkmarks"].req_height + self.padding
             elif s["type"] == "button":
-                if 'name' in s:
+                if "name" in s:
                     s["button"].text = s["name"]
                 s["button"].bbox = pg.Rect(
-                    self.in_bbox.left,
-                    y,
-                    self.in_bbox.width,
-                    s["button"].req_height
+                    self.in_bbox.left, y, self.in_bbox.width, s["button"].req_height
                 )
                 s["button"].update_layout()
                 y += s["button"].req_height + self.padding
@@ -989,13 +1050,27 @@ class SettingsWidget(TitledWidget):
                     self.attributes[i]["checked"] = s["checkmarks"].checked[:]
             elif s["type"] == "button":
                 s["button"].process_event(event)
+
+
 class AxisWidget(TitledWidget):
     """
     A widget that draws 2D projection of 3D axes inside its content area.
     """
-    def __init__(self, parent: pg.Surface, *, x: np.ndarray, y: np.ndarray, z: np.ndarray, padding: int = None,
-                 background: tuple[int, int, int] = (255, 255, 255), foreground: tuple[int, int, int] = (0, 0, 0),
-                 req_width: int = 200, req_height: int = 200, title: str = "Axes"):
+
+    def __init__(
+        self,
+        parent: pg.Surface,
+        *,
+        x: np.ndarray,
+        y: np.ndarray,
+        z: np.ndarray,
+        padding: int = None,
+        background: tuple[int, int, int] = (255, 255, 255),
+        foreground: tuple[int, int, int] = (0, 0, 0),
+        req_width: int = 200,
+        req_height: int = 200,
+        title: str = "Axes",
+    ):
         # Initialize as titled container
         super().__init__(
             parent,
@@ -1004,7 +1079,7 @@ class AxisWidget(TitledWidget):
             foreground=foreground,
             req_width=req_width,
             req_height=req_height,
-            title=title
+            title=title,
         )
         # Axis vectors (2D projection of x, y, z)
         self.x = np.array(x)
@@ -1024,7 +1099,6 @@ class AxisWidget(TitledWidget):
         super().render(screen)
         # Draw axes within the content area
         bbox = self.in_bbox
-        pad = self.padding
         # Build origin and axis endpoints
         origin = np.zeros(2)
         proj = np.stack([origin, self.x[:2], -self.y[:2], self.z[:2]])
@@ -1037,12 +1111,17 @@ class AxisWidget(TitledWidget):
             return
         scale = min(bbox.width, bbox.height) / max(wh)
         center = np.array(bbox.center)
-        scaled = [((p[0]-mins[0]-wh[0]/2)*scale + center[0],
-                   (p[1]-mins[1]-wh[1]/2)*scale + center[1]) for p in proj]
+        scaled = [
+            (
+                (p[0] - mins[0] - wh[0] / 2) * scale + center[0],
+                (p[1] - mins[1] - wh[1] / 2) * scale + center[1],
+            )
+            for p in proj
+        ]
         # Draw each axis line
         for i in range(3):
-            color = [255*(i==j) for j in range(3)]
-            pg.draw.line(screen, color, scaled[0], scaled[i+1], 3)
+            color = [255 * (i == j) for j in range(3)]
+            pg.draw.line(screen, color, scaled[0], scaled[i + 1], 3)
 
 
 class ImageWidget(TitledWidget):
@@ -1050,10 +1129,22 @@ class ImageWidget(TitledWidget):
     A widget that plots 2D points and highlights a current position inside its content area.
     Includes a "Show Drawing" checkbox option.
     """
-    settings_font = pg.font.SysFont('consolas', 12, bold=False)
-    def __init__(self, parent: pg.Surface, *, pixels: list[tuple[int, int]], curr_pos: tuple[int, int], padding: int = None,
-                 background: tuple[int, int, int] = (255, 255, 255), foreground: tuple[int, int, int] = (0, 0, 0), title: str = "Image Plot",
-                 req_width: int = 200, req_height: int = 200):
+
+    settings_font = pg.font.SysFont("consolas", 12, bold=False)
+
+    def __init__(
+        self,
+        parent: pg.Surface,
+        *,
+        pixels: list[tuple[int, int]],
+        curr_pos: tuple[int, int],
+        padding: int = None,
+        background: tuple[int, int, int] = (255, 255, 255),
+        foreground: tuple[int, int, int] = (0, 0, 0),
+        title: str = "Image Plot",
+        req_width: int = 200,
+        req_height: int = 200,
+    ):
         """
         :param parent: the container (e.g. Root) that will manage this widget
         :param pixels: list of (x, y) tuples representing pixel positions
@@ -1072,7 +1163,7 @@ class ImageWidget(TitledWidget):
             foreground=foreground,
             req_width=req_width,
             req_height=req_height,
-            title=title
+            title=title,
         )
         self.pixels = [tuple(p) for p in pixels]
         self.curr_pos = tuple(curr_pos)
@@ -1089,7 +1180,9 @@ class ImageWidget(TitledWidget):
         )
         self.show_checkbox_y_offset = 0  # Will be set in update_layout
 
-    def set_data(self, pixels: list[tuple[int, int]], curr_pos: tuple[int, int]) -> None:
+    def set_data(
+        self, pixels: list[tuple[int, int]], curr_pos: tuple[int, int]
+    ) -> None:
         """
         Update the list of pixels and current position.
         """
@@ -1102,10 +1195,7 @@ class ImageWidget(TitledWidget):
         if self.in_bbox:
             y = self.in_bbox.top
             self.show_checkbox.bbox = pg.Rect(
-                self.in_bbox.left,
-                y,
-                self.in_bbox.width,
-                self.show_checkbox.req_height
+                self.in_bbox.left, y, self.in_bbox.width, self.show_checkbox.req_height
             )
             self.show_checkbox.update_layout()
             self.show_checkbox_y_offset = self.show_checkbox.req_height + self.padding
@@ -1121,17 +1211,17 @@ class ImageWidget(TitledWidget):
         if not self.show_checkbox.checked[0]:
             return
         bbox = self.in_bbox
-        pad = self.padding
         # Adjust drawing area to be below the checkbox
         y_offset = self.show_checkbox_y_offset
         draw_bbox = pg.Rect(
-            bbox.left,
-            bbox.top + y_offset,
-            bbox.width,
-            bbox.height - y_offset
+            bbox.left, bbox.top + y_offset, bbox.width, bbox.height - y_offset
         )
         # Combine points for bounding box
-        pts = np.vstack(self.pixels + [self.curr_pos]) if self.pixels else np.array([self.curr_pos])
+        pts = (
+            np.vstack(self.pixels + [self.curr_pos])
+            if self.pixels
+            else np.array([self.curr_pos])
+        )
         mins = pts.min(axis=0)
         maxs = pts.max(axis=0)
         wh = maxs - mins
@@ -1142,16 +1232,20 @@ class ImageWidget(TitledWidget):
         scale = min(draw_bbox.width, draw_bbox.height) / denom
         center = np.array(draw_bbox.center)
         # Draw current position
-        current_pos = ((self.curr_pos[0]-mins[0]-wh[0]/2)*scale + center[0],
-              (self.curr_pos[1]-mins[1]-wh[1]/2)*scale + center[1])
+        current_pos = (
+            (self.curr_pos[0] - mins[0] - wh[0] / 2) * scale + center[0],
+            (self.curr_pos[1] - mins[1] - wh[1] / 2) * scale + center[1],
+        )
         # Draw a hollowed (outlined) circle at the current position
-        pg.draw.circle(screen, (0, 0, 0), (int(current_pos[0]), int(current_pos[1])), 5, 1)
+        pg.draw.circle(
+            screen, (0, 0, 0), (int(current_pos[0]), int(current_pos[1])), 5, 1
+        )
         # Draw all pixel points
         if self.pixels:
             pts_arr = np.array(self.pixels)
-            scaled = (pts_arr - mins - wh/2) * scale + center
+            scaled = (pts_arr - mins - wh / 2) * scale + center
             for p in scaled:
-                pg.draw.rect(screen, (0,0,0), (int(p[0]), int(p[1]), 1, 1))
+                pg.draw.rect(screen, (0, 0, 0), (int(p[0]), int(p[1]), 1, 1))
 
 
 if __name__ == "__main__":
@@ -1164,63 +1258,42 @@ if __name__ == "__main__":
     settings = SettingsWidget(
         root,
         attributes=[
-            {
-                "type": "slider",
-                "min": 0,
-                "max": 100,
-                "value": 50,
-                "name": "Volume"
-            },
-            {
-                "type": "slider",
-                "min": 0,
-                "max": 1,
-                "value": 0.5,
-                "name": "Brightness"
-            },
+            {"type": "slider", "min": 0, "max": 100, "value": 50, "name": "Volume"},
+            {"type": "slider", "min": 0, "max": 1, "value": 0.5, "name": "Brightness"},
             {
                 "type": "radio",
                 "name": "Mode",
                 "options": ["Easy", "Medium", "Hard"],
-                "selected": 1
+                "selected": 1,
             },
-            {
-                "type": "button",
-                "name": "OK",
-                "onclick": None
-            }
-            ,
+            {"type": "button", "name": "OK", "onclick": None},
             {
                 "type": "checkmark",
                 "name": "Options",
                 "options": ["A", "B", "C"],
-                "checked": [True, False, False]
-            }
+                "checked": [True, False, False],
+            },
         ],
-        title="Settings"
+        title="Settings",
     )
     # Example data for AxisWidget and ImageWidget
     axis_widget = AxisWidget(
-        root,
-        x=[1, 0, 0],
-        y=[0, 1, 0],
-        z=[0, 0, 1],
-        title="3D Axes"
+        root, x=[1, 0, 0], y=[0, 1, 0], z=[0, 0, 1], title="3D Axes"
     )
     image_widget = ImageWidget(
         root,
         pixels=[(10, 10), (20, 30), (40, 50), (60, 80)],
         curr_pos=(30, 40),
-        title="2D Points"
+        title="2D Points",
     )
     checkmarks = Checkboxes(
         root,
         options=["Option 1", "Option 2", "Option 3"],
-        font=pg.font.SysFont('consolas', 12),
+        font=pg.font.SysFont("consolas", 12),
         background=(255, 255, 255),
         checked=[True, False, True],
     )
-    root.update_layout() # Don't forget to call this after adding widgets
+    root.update_layout()  # Don't forget to call this after adding widgets
     running = True
     while running:
         for event in pg.event.get():
