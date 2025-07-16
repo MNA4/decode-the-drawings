@@ -169,16 +169,16 @@ we can use the following formula to convert the pen tip coordinates from the cam
 > source: https://en.wikipedia.org/wiki/Euclidean_vector#Conversion_between_multiple_Cartesian_bases
 
 $$
-x' = \text{x axis} \cdot x
+x' = \text{x axis} \cdot pos
 $$
 $$
-y' = \text{y axis} \cdot y
+y' = \text{y axis} \cdot pos
 $$
 $$
-z' = \text{z axis} \cdot z
+z' = \text{z axis} \cdot pos
 $$
 
-where $x$, $y$, and $z$ are the pen tip coordinates in the camera's coordinate system, and $x'$, $y'$, and $z'$ are the pen tip coordinates in the world's coordinate system.
+where $x$, $y$, and $z$ are the pen tip coordinates in the camera's coordinate system, and $pos$ are the pen tip coordinates in the world's coordinate system.
 
 ### Step 5.7: Check if the Pen is Touching the Paper
 This project uses 2 different methods to check if the pen is touching the paper:
