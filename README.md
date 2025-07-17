@@ -98,10 +98,10 @@ $$
 
 where $\text{projected length}$ is the distance between the projected centers of the balls in the image frame, $z$ is the estimated z-value from the camera to the balls, and $\text{actual length}$ is the actual distance between the balls in the real world.
 
-### Step 5.1: Ball Position Estimation
+### Step 5.1: Compute Rays
 Here, I used the pinhole camera model to compute the rays that point to the center of each ball. The rays are calculated using the formula:
 
-source: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays.html
+> source: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays.html
 
 ```
 ray = normalize(vec3(projected_x-principal_x, projected_y-principal_y, f))
