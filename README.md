@@ -78,6 +78,18 @@ for i, color in enumerate(colors):
 
 Instead of looping through each pixel and checking the threshold, this project uses numpy's vectorized operations to apply the thresholding in one go. This significantly speeds up the processing time.
 
+UPDATE: after reviewing the threshold array, i realized that there are a lot noise coming from low lightness pixels, so I added a lightness threshold to filter out these pixels. The new thresholding algorithm looks like this:
+
+```py
+inv_saturation_threshold = 1 / saturation_threshold  # precompute the inverse of the threshold
+colors = (r,g,b)
+avg = sum(colors) * inv_saturation_threshold * 0.33333  # precompute the average color value
+for i, color in enumerate(colors):
+    if color > avg and color > lightness_threshold:
+        # this pixel is considered a color ball pixel
+        # where i is the index of the color (0 for red, 1 for green, 2 for blue)
+```
+
 ### Step 3: Calculate Projected Center Positions and Radii
 After thresholding, we calculate the projected center position and radius of each ball in the image frame. 
 For now, we just use the center of mass of the detected pixels as the center position, and the radius is computed using the area of the detected pixels.

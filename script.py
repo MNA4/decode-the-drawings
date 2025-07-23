@@ -12,7 +12,12 @@ import numpy as np
 import pygame as pg
 from widgets import Root, ImageWidget, AxisWidget
 from media import video_generator, audio_intensity
-from image_processing import get_all_balls
+from image_processing import (
+    get_all_balls, 
+    threshold,
+    get_tangential_points
+)
+
 from ball_vectors import (
     calibrate_focal_length,
     get_rays,
@@ -32,7 +37,8 @@ VIDEO_PATH = "videos/3.mp4"  # Path to input video
 OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
 PADDING = 10  # Padding for UI widgets
 FPS = 60  # Target frames per second
-PIXEL_THRESHOLD = 75  # Threshold for ball detection (in percent)
+PIXEL_SATURATION_THRESHOLD = 75  # Threshold for ball detection (in percent)
+PIXEL_LIGHTNESS_THRESHOLD = 100  # Threshold for lightness detection (0-255)
 AUDIO_THRESHOLD = 0.0013  # Threshold for pen-down audio detection
 PEN_THRESHOLD = (
     1  # Threshold for pen tip y-coordinate to consider it touching the paper
@@ -40,7 +46,7 @@ PEN_THRESHOLD = (
 INITIAL_Z = 18  # Initial Z distance (cm) for calibration
 PEN_LENGTH = 18  # Length of the pen (cm)
 INITIAL_DST = 9  # Initial distance between balls (cm)
-INV_THRESHOLD = 100 / PIXEL_THRESHOLD  # Inverse threshold, precomputed for efficiency
+INV_SATURATION_THRESHOLD = 100 / PIXEL_SATURATION_THRESHOLD
 
 
 def save_pixels(pixels, filename):
@@ -61,7 +67,10 @@ video = video_generator(VIDEO_PATH)
 frame_array, _ = next(video)  # Get first frame for setup
 
 # Detect initial ball positions and radii
-ball_projected_pos, ball_projected_radius = get_all_balls(frame_array, INV_THRESHOLD)
+threshold_array = threshold(frame_array, 
+                            INV_SATURATION_THRESHOLD, 
+                            PIXEL_LIGHTNESS_THRESHOLD)
+ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
 
 # Calibrate focal length using initial positions
 focal_length = calibrate_focal_length(
@@ -104,8 +113,13 @@ while STATUS != "quit":
             continue
 
         # Detect balls in current frame
+        threshold_array = threshold(frame_array, 
+                                    INV_SATURATION_THRESHOLD,
+                                    PIXEL_LIGHTNESS_THRESHOLD
+                                   )
+        ball_tangential_points = []#get_tangential_points(threshold_array)
         ball_projected_pos, ball_projected_radius = get_all_balls(
-            frame_array, INV_THRESHOLD
+            threshold_array
         )
         pen_down = True
         if not IGNORE_AUDIO:
@@ -153,15 +167,18 @@ while STATUS != "quit":
     # ----------------------
     # Drawing
     # ----------------------
-    screen.blit(pg.surfarray.make_surface(frame_array), (0, 0))
+    display_array = (threshold_array * 255).astype(np.uint8)
+    pg.surfarray.blit_array(screen, display_array)
 
     # Draw detected balls and triangle
-    for j in range(3):
-        pg.draw.circle(screen, (255, 255, 255), ball_projected_pos[j], 10)
-        pg.draw.circle(
-            screen, (255, 255, 255), ball_projected_pos[j], ball_projected_radius[j], 5
-        )
-
+    # for j in range(3):
+    #     pg.draw.circle(screen, (255, 255, 255), ball_projected_pos[j], 10)
+    #     pg.draw.circle(
+    #         screen, (255, 255, 255), ball_projected_pos[j], ball_projected_radius[j], 5
+    #     )
+    for j in ball_tangential_points:
+        for k in j:
+            pg.draw.circle(screen, (255, 255, 255), k, 10, 2)
     # Render UI widgets
     root.render()
     pg.display.flip()
