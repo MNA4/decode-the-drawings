@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 
 def get_all_balls(threshold_array: np.ndarray) -> tuple:
     """
@@ -14,7 +15,7 @@ def get_all_balls(threshold_array: np.ndarray) -> tuple:
     radius = np.empty([3])
     for i in range(3):
         ball_px = np.nonzero(threshold_array[:, :, i])
-        pos[i] = np.mean(ball_px[0]), np.mean(ball_px[1])
+        pos[i] = (ball_px[0].mean(), ball_px[1].mean())
 
         # area = π × radius²
         # radius = √(area ÷ π)
@@ -25,7 +26,7 @@ def get_all_balls(threshold_array: np.ndarray) -> tuple:
 #Only cache 1 shape, to avoid memory issues
 DISTANCE_CACHE = None
 
-def get_tangential_points(threshold_array: np.ndarray) -> np.ndarray:
+def get_tangential_points(threshold_array: np.ndarray, use_line_mask: bool = True) -> np.ndarray:
     """
     Get the tangential points of the balls in the frame.
     Args:
@@ -50,24 +51,69 @@ def get_tangential_points(threshold_array: np.ndarray) -> np.ndarray:
     D = DISTANCE_CACHE
     for i in range(3):
         ball_px = np.nonzero(threshold_array[:, :, i])
+        if use_line_mask:
+            # Create a mask for the line through the center and the ball
+            line_mask = create_line_mask(threshold_array.shape[0], threshold_array.shape[1],
+                                  principal_point, (ball_px[0].mean(), ball_px[1].mean()))
+            ball_px = np.nonzero(np.logical_and(threshold_array[:, :, i], line_mask))
         if ball_px[0].size == 0:
             continue
 
         dists = D[ball_px[0], ball_px[1]]   # 1D array, len = # of nonzero pixels in channel i
 
-        # 3) find which one is nearest / farthest
         idx_near  = np.argmin(dists)
         idx_far   = np.argmax(dists)
 
-        # 4) convert those back into (row, col)
-        y_near, x_near = ball_px[0][idx_near], ball_px[1][idx_near]
-        y_far,  x_far  = ball_px[0][idx_far],  ball_px[1][idx_far]
-
-        # 5) store them
-        tangential_points[i, 0] = (y_near, x_near)
-        tangential_points[i, 1] = (y_far,  x_far)
+        tangential_points[i, 0] = ball_px[0][idx_near], ball_px[1][idx_near]
+        tangential_points[i, 1] = ball_px[0][idx_far],  ball_px[1][idx_far]
     return tangential_points
 
+def create_line_mask(w, h, p1, p2):
+    """
+    Create a mask for the infinite line through p1 and p2,
+    clipped to an image of size (w,h), returned as shape (w,h),
+    with one-pixel continuity.
+    """
+    x0, y0 = p1
+    x1, y1 = p2
+    dx, dy = x1 - x0, y1 - y0
+
+    mask = np.zeros((w, h), dtype=bool)
+
+    # Vertical line
+    if dx == 0:
+        if 0 <= x0 < w:
+            mask[x0, :] = True
+        return mask
+
+    # Horizontal line
+    if dy == 0:
+        if 0 <= y0 < h:
+            mask[:, y0] = True
+        return mask
+
+    slope = dy / dx
+
+    if abs(slope) <= 1:
+        xs = np.arange(w)
+        ys = y0 + slope * (xs - x0)
+        ys_round = np.round(ys).astype(int)
+        valid = (ys_round >= 0) & (ys_round < h)
+        xs_valid = xs[valid]
+        ys_valid = ys_round[valid]
+        mask[xs_valid, ys_valid] = True
+
+    else:
+        inv_slope = dx / dy
+        ys = np.arange(h)
+        xs = x0 + inv_slope * (ys - y0)
+        xs_round = np.round(xs).astype(int)
+        valid = (xs_round >= 0) & (xs_round < w)
+        xs_valid = xs_round[valid]
+        ys_valid = ys[valid]
+        mask[xs_valid, ys_valid] = True
+
+    return mask
 
 def threshold(frame_array: np.ndarray, inv_saturation_threshold: float, lightness_threshold: float) -> np.ndarray:
     """
@@ -84,3 +130,25 @@ def threshold(frame_array: np.ndarray, inv_saturation_threshold: float, lightnes
     return np.logical_and(
            frame_array > (avg * inv_saturation_threshold)[:, :, np.newaxis],
            frame_array > lightness_threshold)
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    # Define image dimensions and two points
+    w, h = 120, 80
+    p1 = (20, 10)
+    p2 = (100, 70)
+
+    # Generate the mask
+    mask_wh = create_line_mask(w, h, p1, p2)
+
+    # Inspect the shape
+    print("mask shape (w, h):", mask_wh.shape)  # -> (120, 80)
+
+    # Visualize: transpose back to (h,w) for imshow
+    plt.figure(figsize=(6,4))
+    plt.imshow(mask_wh.T, cmap="gray", origin="lower")
+    plt.scatter([p1[0], p2[0]], [p1[1], p2[1]], c="red", zorder=2)
+    plt.title("Infinite Line Mask (visualized)")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.show()

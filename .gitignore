@@ -175,5 +175,7 @@ pyrightconfig.json
 
 # Video files
 videos/
+
+calib/
 # End of https://www.toptal.com/developers/gitignore/api/python
 

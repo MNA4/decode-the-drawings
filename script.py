@@ -117,7 +117,7 @@ while STATUS != "quit":
                                     INV_SATURATION_THRESHOLD,
                                     PIXEL_LIGHTNESS_THRESHOLD
                                    )
-        ball_tangential_points = []#get_tangential_points(threshold_array)
+        ball_tangential_points = get_tangential_points(threshold_array)
         ball_projected_pos, ball_projected_radius = get_all_balls(
             threshold_array
         )
