@@ -1,5 +1,4 @@
 import numpy as np
-import cv2
 
 def get_all_balls(threshold_array: np.ndarray) -> tuple:
     """
