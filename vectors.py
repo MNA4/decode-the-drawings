@@ -5,7 +5,7 @@ Mathematical utilities for 3D geometry, camera calibration, and orientation esti
 
 import numpy as np
 
-def distance(v: np.ndarray) -> float:
+def distance(v: np.ndarray, axis = None) -> float:
     """
     Calculate the Euclidean distance (L2 norm) of a vector.
     Args:
@@ -13,10 +13,10 @@ def distance(v: np.ndarray) -> float:
     Returns:
         float: The Euclidean distance of the vector.
     """
-    return np.linalg.norm(v)
+    return np.linalg.norm(v, axis = axis, keepdims=True)
 
 
-def normalize(v: np.ndarray) -> np.ndarray:
+def normalize(v: np.ndarray, axis = None) -> np.ndarray:
     """
     Normalize a vector to unit length.
     Args:
@@ -24,7 +24,7 @@ def normalize(v: np.ndarray) -> np.ndarray:
     Returns:
         numpy.ndarray: The normalized vector.
     """
-    return v / distance(v)
+    return v / distance(v, axis = axis)
 
 
 def calibrate_focal_length(*points: np.ndarray, initial_z: float, initial_dst: float) -> float:
@@ -69,9 +69,7 @@ def get_rays(projected_points: np.ndarray, vw: int, vh: int, f: float) -> np.nda
     rays[:, 0] = projected_points[:, 0] - vw / 2
     rays[:, 1] = - (projected_points[:, 1] - vh / 2)
     rays[:, 2] = -f
-    # Normalize the rays to unit length
-    rays = rays / np.linalg.norm(rays, axis=1, keepdims=True)
-    return rays
+    return normalize(rays, axis=1)
 
 
 def compute_ts(r1: np.ndarray, r2: np.ndarray, r3: np.ndarray, side: float) -> tuple:
@@ -127,3 +125,25 @@ def orient_pos(pos: np.ndarray,
         np.dot(pos, y_axis),
         np.dot(pos, z_axis),
     ])
+
+def find_angle_bisectors(p1s: np.ndarray, p2s: np.ndarray, vw: int, vh: int, f: float, ball_radius: int) -> tuple:
+    """
+    find the angle bisectors between rays p1s and p2s.
+    Args:
+        p1s, p2s (numpy.ndarray): where rays that point to p1s and p2s are tangential to the balls.
+        vw (int): The width of the viewport.
+        vh (int): The height of the viewport.
+        f (float): The focal length of the camera.
+    Returns:
+        numpy.ndarray: An array of shape (N, 3) containing the rays in 3D space,
+                      where N is the number of balls.
+                      
+        numpy.ndarray: An array of shape (N,) containing the lengths of the bisectors.
+    """
+    r1s = get_rays(p1s, vw, vh, f)
+    r2s = get_rays(p2s, vw, vh, f)
+    c = normalize(np.sum([r1s, r2s], axis=0), axis=1)  # Average the rays to find angle bisectors
+    dot_products = np.sum(c * r1s, axis=1)
+    sin_ = np.sqrt(1 - dot_products ** 2)
+    L = ball_radius / sin_  # Length of the bisectors
+    return c, L

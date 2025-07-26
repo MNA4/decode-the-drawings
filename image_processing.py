@@ -42,7 +42,6 @@ def get_tangential_points(threshold_array: np.ndarray, use_line_mask: bool = Tru
     principal_point = np.array(threshold_array.shape[:2]) // 2
 
     if DISTANCE_CACHE is None or DISTANCE_CACHE.shape != threshold_array.shape[:2]:
-        DISTANCE_CACHE = np.empty(threshold_array.shape[:2], dtype=np.uint32)
         x,y = np.indices(threshold_array.shape[:2])
         DISTANCE_CACHE = (x - principal_point[0]) ** 2 + \
                          (y - principal_point[1]) ** 2
@@ -51,10 +50,10 @@ def get_tangential_points(threshold_array: np.ndarray, use_line_mask: bool = Tru
     for i in range(3):
         ball_px = np.nonzero(threshold_array[:, :, i])
         if use_line_mask:
-            # Create a mask for the line through the center and the ball
-            line_mask = create_line_mask(threshold_array.shape[0], threshold_array.shape[1],
-                                  principal_point, (ball_px[0].mean(), ball_px[1].mean()))
-            ball_px = np.nonzero(np.logical_and(threshold_array[:, :, i], line_mask))
+            ball_px = filter_line((ball_px[0].mean(), ball_px[1].mean()),
+                                   principal_point,
+                                   ball_px
+                                 )
         if ball_px[0].size == 0:
             continue
 
@@ -67,52 +66,30 @@ def get_tangential_points(threshold_array: np.ndarray, use_line_mask: bool = Tru
         tangential_points[i, 1] = ball_px[0][idx_far],  ball_px[1][idx_far]
     return tangential_points
 
-def create_line_mask(w, h, p1, p2):
+def filter_line(p1, p2, nonzeros):
     """
-    Create a mask for the infinite line through p1 and p2,
-    clipped to an image of size (w,h), returned as shape (w,h),
-    with one-pixel continuity.
+    Filter the nonzero pixels to only include those that are on the infinite line defined by p1 and p2.
+    Args:
+        p1: First point (x, y).
+        p2: Second point (x, y).
+        nonzeros: Nonzero pixel coordinates.
+    Returns:
+        Filtered nonzero pixel coordinates that are on the infinite line.
     """
     x0, y0 = p1
     x1, y1 = p2
     dx, dy = x1 - x0, y1 - y0
-
-    mask = np.zeros((w, h), dtype=bool)
-
-    # Vertical line
-    if dx == 0:
-        if 0 <= x0 < w:
-            mask[x0, :] = True
-        return mask
-
-    # Horizontal line
-    if dy == 0:
-        if 0 <= y0 < h:
-            mask[:, y0] = True
-        return mask
-
-    slope = dy / dx
-
-    if abs(slope) <= 1:
-        xs = np.arange(w)
-        ys = y0 + slope * (xs - x0)
-        ys_round = np.round(ys).astype(int)
-        valid = (ys_round >= 0) & (ys_round < h)
-        xs_valid = xs[valid]
-        ys_valid = ys_round[valid]
-        mask[xs_valid, ys_valid] = True
-
+    if dx == 0 and dy == 0:
+        return nonzeros  # p1 and p2 are the same point, return all nonzeros
+    elif dy <= dx:
+        slope = dy / dx
+        ys = y0 + slope * (nonzeros[0] - x0)
+        mask = np.round(ys) == nonzeros[1]
     else:
         inv_slope = dx / dy
-        ys = np.arange(h)
-        xs = x0 + inv_slope * (ys - y0)
-        xs_round = np.round(xs).astype(int)
-        valid = (xs_round >= 0) & (xs_round < w)
-        xs_valid = xs_round[valid]
-        ys_valid = ys[valid]
-        mask[xs_valid, ys_valid] = True
-
-    return mask
+        xs = x0 + inv_slope * (nonzeros[1] - y0)
+        mask = np.round(xs) == nonzeros[0]
+    return nonzeros[0][mask], nonzeros[1][mask]
 
 def threshold(frame_array: np.ndarray, inv_saturation_threshold: float, lightness_threshold: float) -> np.ndarray:
     """
@@ -125,29 +102,13 @@ def threshold(frame_array: np.ndarray, inv_saturation_threshold: float, lightnes
     Returns:
         numpy.ndarray: A 3D binary mask where pixels above the threshold are set to True.
     """
-    avg = np.sum(frame_array, axis=2) * 0.3333
-    return np.logical_and(
-           frame_array > (avg * inv_saturation_threshold)[:, :, np.newaxis],
-           frame_array > lightness_threshold)
+    avg = np.sum(frame_array, axis=2, dtype=np.float32) * 0.3333  # float32 faster, avoids overflow
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    # Define image dimensions and two points
-    w, h = 120, 80
-    p1 = (20, 10)
-    p2 = (100, 70)
+    # Precompute scaled threshold
+    sat_thresh = (avg * inv_saturation_threshold).astype(frame_array.dtype)  # same type as frame for fast comp
 
-    # Generate the mask
-    mask_wh = create_line_mask(w, h, p1, p2)
+    # Vectorized threshold checks (no broadcasting temp arrays)
+    above_sat = frame_array > sat_thresh[:, :, None]
+    above_light = frame_array > lightness_threshold
 
-    # Inspect the shape
-    print("mask shape (w, h):", mask_wh.shape)  # -> (120, 80)
-
-    # Visualize: transpose back to (h,w) for imshow
-    plt.figure(figsize=(6,4))
-    plt.imshow(mask_wh.T, cmap="gray", origin="lower")
-    plt.scatter([p1[0], p2[0]], [p1[1], p2[1]], c="red", zorder=2)
-    plt.title("Infinite Line Mask (visualized)")
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.show()
+    return np.logical_and(above_sat, above_light)
