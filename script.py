@@ -45,7 +45,7 @@ TANGENTIAL_ELLIPSE_CORRECTION = (
 # Else use weighted average to correct ellipse distortion.
 WEIGHT_PIXELS = True
 USE_LINE_MASK = False
-VIDEO_PATH = "videos/4.mp4"  # Path to input video
+VIDEO_PATH = "videos/3.mp4"  # Path to input video
 OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
 PADDING = 10  # Padding for UI widgets
 FPS = 60  # Target frames per second
@@ -155,7 +155,7 @@ while STATUS != "quit":
                 )
             else:
                 if WEIGHT_PIXELS:
-                    ball_projected_pos, ball_apparent_radius = get_all_balls_weighted(
+                    ball_projected_pos, ball_fractional_area = get_all_balls_weighted(
                         threshold_array, focal_length
                     )
                 else:
@@ -171,7 +171,7 @@ while STATUS != "quit":
                     scale_factors = distances
                 elif WEIGHT_PIXELS:
                     scale_factors = distance_from_area(
-                        ball_apparent_radius, focal_length, BALL_RADIUS
+                        ball_fractional_area, focal_length, BALL_RADIUS
                     )
                 else:
                     # Use projected and actual radii to solve for scale factors
