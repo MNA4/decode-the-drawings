@@ -934,6 +934,7 @@ class SettingsWidget(TitledWidget):
                         c.bbox = bbox
                     y += c.req_height + self.padding
             elif s["type"] == "radio":
+                s["label"].text = a.get("name", "Unnamed Radio")
                 new_options = a.get("options", [])
                 s["radio"].selected = a.get("selected", -1)
                 old_labels = s["radio"].labels
@@ -976,6 +977,7 @@ class SettingsWidget(TitledWidget):
                 s["radio"].update_layout()
                 y += s["radio"].req_height + self.padding
             elif s["type"] == "checkmark":
+                s["label"].text = a.get("name", "Unnamed Radio")
                 new_options = a.get("options", [])
                 new_checked = a.get("checked", [False] * len(new_options))
                 old_labels = s["checkmarks"].labels
@@ -1017,8 +1019,8 @@ class SettingsWidget(TitledWidget):
                 s["checkmarks"].update_layout()
                 y += s["checkmarks"].req_height + self.padding
             elif s["type"] == "button":
-                if "name" in s:
-                    s["button"].text = s["name"]
+                s["button"].text = a.get("name", "Button")
+                s["button"].on_click = a["onclick"]
                 s["button"].bbox = pg.Rect(
                     self.in_bbox.left, y, self.in_bbox.width, s["button"].req_height
                 )

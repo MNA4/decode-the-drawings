@@ -1,4 +1,6 @@
 import numpy as np
+from vectors import area_fraction_image
+
 
 def get_all_balls(threshold_array: np.ndarray) -> tuple:
     """
@@ -22,10 +24,54 @@ def get_all_balls(threshold_array: np.ndarray) -> tuple:
         radius[i] = np.sqrt(ball_px[0].shape[0] / np.pi)
     return pos, radius
 
-#Only cache 1 shape, to avoid memory issues
+
+PIXEL_AREA_CACHE = None
+F_CACHE = None
+
+
+def get_all_balls_weighted(threshold_array: np.ndarray, f: float) -> tuple:
+    """
+    Calculate the weighted positions and radii of all balls in the frame,
+    using per-pixel solid-angle fractions as weights.
+    Args:
+        threshold_array (numpy.ndarray): shape (w, h, 3), boolean or 0/1 mask per color.
+        f (float): focal length, same units as area_fraction_image expects.
+    Returns:
+        pos (np.ndarray): shape (3,2) of weighted centroids (x,y).
+        radius (np.ndarray): shape (3,), the circle's apparent radii on the unit sphere.
+    """
+    global PIXEL_AREA_CACHE, F_CACHE
+    w, h = threshold_array.shape[:2]
+    cx = w / 2  # or your actual principal-point
+    cy = h / 2
+    # lazily build the area‐fraction cache if needed
+    if PIXEL_AREA_CACHE is None or PIXEL_AREA_CACHE.shape != (w, h) or F_CACHE != f:
+        PIXEL_AREA_CACHE = area_fraction_image(w, h, cx, cy, f)
+        F_CACHE = f
+
+    pos = np.zeros((3, 2), dtype=float)
+    A = np.zeros(3, dtype=float)
+
+    for i in range(3):
+        xs, ys = np.nonzero(threshold_array[:, :, i])
+        weights = PIXEL_AREA_CACHE[xs, ys]
+
+        # weighted centroid using np.average
+        pos[i, 0] = np.average(xs, weights=weights)
+        pos[i, 1] = np.average(ys, weights=weights)
+
+        # weighted area → radius on unit sphere
+        A[i] = np.sum(weights)
+    return pos, A
+
+
+# Only cache 1 shape, to avoid memory issues
 DISTANCE_CACHE = None
 
-def get_tangential_points(threshold_array: np.ndarray, use_line_mask: bool = True) -> np.ndarray:
+
+def get_tangential_points(
+    threshold_array: np.ndarray, use_line_mask: bool = True
+) -> np.ndarray:
     """
     Get the tangential points of the balls in the frame.
     Args:
@@ -42,29 +88,30 @@ def get_tangential_points(threshold_array: np.ndarray, use_line_mask: bool = Tru
     principal_point = np.array(threshold_array.shape[:2]) // 2
 
     if DISTANCE_CACHE is None or DISTANCE_CACHE.shape != threshold_array.shape[:2]:
-        x,y = np.indices(threshold_array.shape[:2])
-        DISTANCE_CACHE = (x - principal_point[0]) ** 2 + \
-                         (y - principal_point[1]) ** 2
+        x, y = np.indices(threshold_array.shape[:2])
+        DISTANCE_CACHE = (x - principal_point[0]) ** 2 + (y - principal_point[1]) ** 2
 
     D = DISTANCE_CACHE
     for i in range(3):
         ball_px = np.nonzero(threshold_array[:, :, i])
         if use_line_mask:
-            ball_px = filter_line((ball_px[0].mean(), ball_px[1].mean()),
-                                   principal_point,
-                                   ball_px
-                                 )
+            ball_px = filter_line(
+                (ball_px[0].mean(), ball_px[1].mean()), principal_point, ball_px
+            )
         if ball_px[0].size == 0:
             continue
 
-        dists = D[ball_px[0], ball_px[1]]   # 1D array, len = # of nonzero pixels in channel i
+        dists = D[
+            ball_px[0], ball_px[1]
+        ]  # 1D array, len = # of nonzero pixels in channel i
 
-        idx_near  = np.argmin(dists)
-        idx_far   = np.argmax(dists)
+        idx_near = np.argmin(dists)
+        idx_far = np.argmax(dists)
 
         tangential_points[i, 0] = ball_px[0][idx_near], ball_px[1][idx_near]
-        tangential_points[i, 1] = ball_px[0][idx_far],  ball_px[1][idx_far]
+        tangential_points[i, 1] = ball_px[0][idx_far], ball_px[1][idx_far]
     return tangential_points
+
 
 def filter_line(p1, p2, nonzeros):
     """
@@ -91,21 +138,28 @@ def filter_line(p1, p2, nonzeros):
         mask = np.round(xs) == nonzeros[0]
     return nonzeros[0][mask], nonzeros[1][mask]
 
-def threshold(frame_array: np.ndarray, inv_saturation_threshold: float, lightness_threshold: float) -> np.ndarray:
+
+def threshold(
+    frame_array: np.ndarray, inv_saturation_threshold: float, lightness_threshold: float
+) -> np.ndarray:
     """
     Apply a threshold to the frame array to create a binary mask.
     Args:
         frame_array (numpy.ndarray): The video frame as a 3D numpy array (width, height, channels).
         inv_saturation_threshold (float): The inverse of the saturation threshold for detecting ball pixels.
-                                          saturation threshold is in the range (0-1). 
+                                          saturation threshold is in the range (0-1).
         lightness_threshold (float): The lightness threshold for detecting ball pixels. (0-255)
     Returns:
         numpy.ndarray: A 3D binary mask where pixels above the threshold are set to True.
     """
-    avg = np.sum(frame_array, axis=2, dtype=np.float32) * 0.3333  # float32 faster, avoids overflow
+    avg = (
+        np.sum(frame_array, axis=2, dtype=np.float32) * 0.3333
+    )  # float32 faster, avoids overflow
 
     # Precompute scaled threshold
-    sat_thresh = (avg * inv_saturation_threshold).astype(frame_array.dtype)  # same type as frame for fast comp
+    sat_thresh = (avg * inv_saturation_threshold).astype(
+        frame_array.dtype
+    )  # same type as frame for fast comp
 
     # Vectorized threshold checks (no broadcasting temp arrays)
     above_sat = frame_array > sat_thresh[:, :, None]

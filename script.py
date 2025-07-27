@@ -13,7 +13,12 @@ import numpy as np
 import pygame as pg
 from widgets import Root, ImageWidget, AxisWidget
 from media import video_generator, audio_intensity
-from image_processing import get_all_balls, threshold, get_tangential_points
+from image_processing import (
+    get_all_balls,
+    threshold,
+    get_tangential_points,
+    get_all_balls_weighted,
+)
 
 from vectors import (
     calibrate_focal_length,
@@ -21,19 +26,26 @@ from vectors import (
     compute_ts,
     get_orientation,
     orient_pos,
-    find_angle_bisectors
+    find_angle_bisectors,
+    distance_from_area,
 )
 
 # ----------------------
 # Configuration
 # ----------------------
-IGNORE_BALL_RADIUS = False  # If True, use the law of cosines; else, estimate from ball projected radius.
+IGNORE_BALL_RADIUS = (
+    False  # If True, use the law of cosines; else, estimate from ball projected radius.
+)
 IGNORE_AUDIO = (
     False  # If True, use pen-y coordinate to detect pen-down; else, use audio intensity
 )
-CORRECT_ELLIPSE = True
+TANGENTIAL_ELLIPSE_CORRECTION = (
+    False  # If True, use tangential points for ellipse correction,
+)
+# Else use weighted average to correct ellipse distortion.
+WEIGHT_PIXELS = True
 USE_LINE_MASK = False
-VIDEO_PATH = "videos/1.mp4"  # Path to input video
+VIDEO_PATH = "videos/4.mp4"  # Path to input video
 OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
 PADDING = 10  # Padding for UI widgets
 FPS = 60  # Target frames per second
@@ -46,6 +58,7 @@ PEN_THRESHOLD = (
 INITIAL_Z = 18  # Initial Z distance (cm) for calibration
 PEN_LENGTH = 18  # Length of the pen (cm)
 INITIAL_DST = 9  # Initial distance between balls (cm)
+BALL_RADIUS = 3
 INV_SATURATION_THRESHOLD = 100 / PIXEL_SATURATION_THRESHOLD
 
 
@@ -78,8 +91,8 @@ focal_length = calibrate_focal_length(
 )
 
 # Estimate actual ball radius if not ignored
-ball_actual_radius = None
-if not IGNORE_BALL_RADIUS:
+ball_actual_radius = BALL_RADIUS
+if not IGNORE_BALL_RADIUS and not WEIGHT_PIXELS:
     # The balls may have a slightly different radius than assumed
     ball_actual_radius = ball_projected_radius * INITIAL_Z / focal_length
 
@@ -120,42 +133,52 @@ while STATUS != "quit":
             aud_intensity = audio_intensity(aud_array)
             if aud_intensity < AUDIO_THRESHOLD:
                 pen_down = False
-                
+
         # Detect balls in current frame
         threshold_array = threshold(
             frame_array, INV_SATURATION_THRESHOLD, PIXEL_LIGHTNESS_THRESHOLD
         )
-        if CORRECT_ELLIPSE:
-            ball_tangential_points = get_tangential_points(threshold_array, USE_LINE_MASK)
-            rays, lengths = find_angle_bisectors(ball_tangential_points[:,0,:],
-                                                ball_tangential_points[:,1,:],
-                                                width,
-                                                height,
-                                                focal_length,
-                                                ball_actual_radius)
-        else:
-            ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
 
         if pen_down:
             # Compute 3D rays from camera to each ball
-            if CORRECT_ELLIPSE:
-                ball_rays = rays
+            if TANGENTIAL_ELLIPSE_CORRECTION:
+                ball_tangential_points = get_tangential_points(
+                    threshold_array, USE_LINE_MASK
+                )
+                ball_rays, distances = find_angle_bisectors(
+                    ball_tangential_points[:, 0, :],
+                    ball_tangential_points[:, 1, :],
+                    width,
+                    height,
+                    focal_length,
+                    ball_actual_radius,
+                )
             else:
+                if WEIGHT_PIXELS:
+                    ball_projected_pos, ball_apparent_radius = get_all_balls_weighted(
+                        threshold_array, focal_length
+                    )
+                else:
+                    ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
+                    
                 ball_rays = get_rays(ball_projected_pos, width, height, focal_length)
 
             if IGNORE_BALL_RADIUS:
                 # Use geometric constraint to solve for scale factors
                 scale_factors = compute_ts(*ball_rays, INITIAL_DST)
             else:
-                if CORRECT_ELLIPSE:
-                    scale_factors = lengths
+                if TANGENTIAL_ELLIPSE_CORRECTION:
+                    scale_factors = distances
+                elif WEIGHT_PIXELS:
+                    scale_factors = distance_from_area(
+                        ball_apparent_radius, focal_length, BALL_RADIUS
+                    )
                 else:
                     # Use projected and actual radii to solve for scale factors
                     z = ball_actual_radius / ball_projected_radius * focal_length
                     scale_factors = -z / ball_rays[:, 2]
 
             ball_actual_pos = ball_rays * scale_factors[:, np.newaxis]
-
             # Compute orientation of the triangle formed by the balls
             x_axis, y_axis, z_axis = get_orientation(
                 ball_actual_pos[0], ball_actual_pos[1], ball_actual_pos[2]
@@ -183,16 +206,23 @@ while STATUS != "quit":
     # ----------------------
     display_array = (threshold_array * 255).astype(np.uint8)
     pg.surfarray.blit_array(screen, display_array)
-
-    # Draw detected balls and triangle
-    # for j in range(3):
-    #     pg.draw.circle(screen, (255, 255, 255), ball_projected_pos[j], 10)
-    #     pg.draw.circle(
-    #         screen, (255, 255, 255), ball_projected_pos[j], ball_projected_radius[j], 5
-    #     )
-    for j in ball_tangential_points:
-        for k in j:
-            pg.draw.circle(screen, (255, 255, 255), k, 10, 2)
+    if pen_down:
+        if TANGENTIAL_ELLIPSE_CORRECTION:
+            for j in ball_tangential_points:
+                for k in j:
+                    pg.draw.circle(screen, (255, 255, 255), k, 10, 2)
+        else:
+            for j in range(3):
+                pg.draw.circle(screen, (255, 255, 255), ball_projected_pos[j], 10)
+                if WEIGHT_PIXELS:
+                    continue
+                pg.draw.circle(
+                    screen,
+                    (255, 255, 255),
+                    ball_projected_pos[j],
+                    ball_projected_radius[j],
+                    5,
+                )
     # Render UI widgets
     root.render()
     pg.display.flip()
