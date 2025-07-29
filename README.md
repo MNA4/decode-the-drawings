@@ -94,12 +94,31 @@ for i, color in enumerate(colors):
 After thresholding, we calculate the projected center position and radius of each ball in the image frame. 
 
 This project uses 3 different ways to calculate the ball's projected center & its distance from the camera:
-#### Method 1, non weighted pixel's average coordinate & area
+#### Method 1: unweighted pixel's average coordinate & area
 To approximate the projected center of each ball, we could just calculate the average nonzero pixels' coordinate.
 
 And use the equation $\text{area}=\pi r^2$ to get each ball's projected radii.
 
 However, the ball actually got distorted. which means its actually an ellipse, not a circle. this causes inaccuracy when computing the ball's positions.
+
+##### Calculating the distance from each ball to the camera with given physical & projected radius
+
+We use the following formula to get the z position of the ball with given camera focal length and the ball's physical & projected radius:
+
+source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
+
+$$
+z_i = \frac{\text{focal length} \times \text{actual radius}}{\text{projected radius}}
+$$
+
+Where $\text{focal length}$ is the focal length calculated in step 4.1, $\text{actual radius}$ is the physical radius of the ball, and $\text{projected radius}$ is the radius of the ball in the image frame.
+
+And then we use the following formula to get the distance between the camera and the ball:
+
+```
+distances[i] = (z[i] / ray[i].z)
+```
+
 #### Method 2: ball's tangential point
 
 We know that a sphere projected by a pinhole camera model results in an ellipse pointing towards the principal point. ([Inigo Quilez made an excellent proof here](https://iquilezles.org/articles/sphereproj/))
@@ -110,21 +129,51 @@ The angle bisector we just calculated should point directly to the center of eac
 
 This method handles the ellipse distortion pretty well, but it causes too much noise to be useful.
 
+##### Calculating the distance from each ball to the camera with given tangential rays
+
+*Image 2: Tangential Rays*
+
+![Image 2: Tangential Rays](https://raw.githubusercontent.com/MNA4/decode-the-drawings/main/images/tangential_rays.png)
+
+Suppose $\hat{C}$ is the unit ray pointing from the camera to the ball, and $\hat{P}$ is any unit ray tangent to the ball.
+
+$$
+\begin{align}
+\hat{P} \cdot \hat{C} &= \cos{\theta} = \frac{OP}{OC}, \\
+
+\frac{PC}{OC} &= \sin{\theta} \\
+              &= \sqrt{1-\cos^2{\theta}} \\
+              &= \sqrt{1-(\hat{P} \cdot \hat{C})^2}, \\
+\end{align}
+$$
+
+We find:
+
+$$
+\text{distance from the camera to the ball} = OC = \frac{PC}{\sqrt{1-(\hat{P} \cdot \hat{C})^2}}
+$$ 
+
+Where:
+
+- $PC$ = ball's radius
+- $\hat{P}$ = unit tangent ray
+- $\hat{C}$ = unit camera‑to‑ball ray
+
 #### Method 3: weighted pixel's average coordinate & area
 
-To correct the ball’s elliptical distortion, we calculate the weighted average of the pixel positions based on the fraction of the 360 × 180 unit sphere area they occupy.
+To correct the ball’s elliptical distortion, we calculate the weighted average of the pixel positions based on the fraction of the $360\degree × 180\degree$ unit sphere area they occupy.
 
 According to [wikipedia](https://en.wikipedia.org/wiki/Solid_angle):
 > The solid angle for an arbitrary oriented surface S subtended at a point P is equal to the solid angle of the projection of the surface S to the unit sphere with center P, which can be calculated as the surface integral:
 >
 > $$
-> \Omega = \iint_S d \Omega = \iint_S \frac{\vec{r} \cdot \hat{n}}{r^3} \, dS
+> \Omega = \iint_S d\Omega = \iint_S \frac{\vec{r} \cdot \hat{n}}{r^3}  dS
 > $$
 >
 > where $\hat{r} = \frac{\vec{r}}{r}$ is the unit vector corresponding to $\vec{r}$, the position vector of an infinitesimal surface element $dS$ with respect to point $P$ and where $\hat{n}$ represents the unit normal vector to $dS$.
 >
 
-By substituting $\hat{r} = \frac{\vec{r}}{r}$, we get: 
+By substituting $\hat{r} = \frac{\vec{r}}{r},$ we get: 
 
 $$
 d\Omega = \frac{\hat{r} \cdot \hat{n}}{r^2} dS = \frac{\vec{r} \cdot \hat{n}}{r^3}dS
@@ -152,29 +201,88 @@ $$
 
 where:
 
-$\Omega$ = solid angle (in steradians)
-
-$d\Omega$ = differential solid angle (in steradians)
-
-$f$ = camera's focal length
-
-$(c_x, c_y)$ = camera's principal point
-
-$(x,y)$ = pixel's coordinate
-
-$dS = 1$ (since each pixel in the image plane corresponds to a unit area).
+- $\Omega$ = solid angle (in steradians)
+- $d\Omega$ = differential solid angle (in steradians)
+- $f$ = camera's focal length
+- $(c_x, c_y)$ = camera's principal point
+- $(x,y)$ = pixel's coordinate
+- $dS = 1$ (since each pixel in the image plane corresponds to 1 unit area)
 
 For sufficiently small solid angles $\Omega$, the approximation $\Omega \approx d\Omega$  holds.
 
-To get fractional area, we divide solid angle $\Omega$ by a full steradian ($4\pi$):
+To get the pixel's fractional area, we divide solid angle $\Omega$ by a full steradian ($4\pi$):
 
 $$
-\text{fractional area} = \frac{\Omega}{4\pi}
+\text{pixel fractional area} = \frac{\Omega}{4\pi}
 $$
 
-Unfortunately we must use method 1 for the camera focal-length calibration. this is because method 2 & 3 require the camera focal-length to be known in advance.
+And we weight each pixel based on their fractional area to get each ball's projected center:
+```py
+
+weights = PIXEL_AREAS
+
+# weighted centroid using np.average
+ball_projected_center_x = np.average(ball_x_pixels, weights=weights)
+ball_projected_center_y = np.average(ball_y_pixels, weights=weights)
+```
+
+To get the ball’s fractional area, we sum the fractional areas of all nonzero pixels:
+
+$$
+\text{ball fractional area} = \sum{\text{pixel fractional area}}
+$$
+
+##### Calculating the distance from each ball to the camera with given fractional area
+
+*Image 3: Spherical cap*
+
+![Image 3: Spherical cap](https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Spherical_cap_diagram.tiff/lossless-page1-597px-Spherical_cap_diagram.tiff.png)
+
+We're gonna find the ball's apparent radius, given its fractional area. 
+
+According to [wikipedia](https://en.wikipedia.org/wiki/Spherical_cap), a sphere cap's surface area can be calculated using the formula:
+
+$$
+{A=2\pi r^{2}(1-\cos \theta )}
+$$
+
+In a unit sphere, $r = 1$. so:
+
+$$
+\begin{align}
+A&=2\pi (1-\cos \theta ) \text{ (in steradians)} \\
+
+A&=\frac{1}{2} (1-\cos \theta ) \text{ (in fractional area)}
+\end{align}
+$$
+
+Solve for $\theta$:
+
+$$
+\text{angular radius } \theta = \arccos (1-2A)
+$$
+
+We know that $\sin \theta = \frac{PC}{OC}$ (see Image 2), so:
+
+$$
+\begin{align}
+OC &= \frac{PC}{\sin \theta}  \\
+   &= \frac{PC}{\sin (\arccos (1-2A))} \\
+   &= \frac{PC}{\sqrt{1 - (1 - 2A)^2}} \\
+\end{align}
+$$
+
+Where:
+
+- $OC$ = distance between the camera and the ball
+- $PC$ = ball's radius
+- $A$ = ball's fractional area
+
 ### Step 4.1: Camera Calibration
-I used the average distance between the balls to calculate the camera's focal length. This is done by comparing the average projected distance between each pair of balls in the image frame with their actual given distances.
+**Unfortunately we must use method 1 (in step 3) for the camera focal-length calibration. since method 2 & 3 require the camera focal-length to be known in advance.**
+
+We compare the average projected distance between each pair of balls in the image frame with their actual given distances to estimate the camera's focal length.
+
 This allows the program to construct a pinhole camera model, which is essential for accurately estimating the 3D positions of the balls.
 
 The focal length is calculated using the formula:
@@ -196,7 +304,7 @@ source: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-gen
 ray = normalize(vec3(projected_x-principal_x, projected_y-principal_y, f))
 ```
 
-where `projected_x` and `projected_y` are the x and y coordinates of the projected center of the ball in the image frame, `principal_x` and `principal_y` are the principal point coordinates, and `f` is the focal length calculated in step 4.1.
+where `projected_x` and `projected_y` are the x and y coordinates of the projected center of each ball in the image frame, `principal_x` and `principal_y` are the principal point coordinates, and `f` is the focal length calculated in step 4.1.
 
 This gives us a unit vector pointing from the camera to the center of each ball in the image frame (in the camera's coordinate system).
 for most cameras, the principal point is at the center of the image, so `principal_x` and `principal_y` are half the width and height of the image respectively.
@@ -229,27 +337,17 @@ $$
 
 we can find the real world position of each ball by multiplying the ray by the distance:
 ```
-position[i] = ray[i] * t[i]
+positions[i] = rays[i] * t[i]
 ```
 
-#### Method 2: Using the projected radius of the ball in the image frame (trilateration)
+#### Method 2: Using the distance we computed in step 3 (trilateration)
 
-*Image 2: Tangential Rays*
+Again, here we use the formula
 
-![Image 2: Tangential Rays](https://raw.githubusercontent.com/MNA4/decode-the-drawings/main/images/tangential_rays.png)
-
-source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
-
-$$
-z_i = \frac{\text{focal length} \times \text{actual radius}}{\text{projected radius}}
-$$
-
-where $\text{focal length}$ is the focal length calculated in step 4.1, $\text{actual radius}$ is the physical radius of the ball, and $\text{projected radius}$ is the radius of the ball in the image frame.
-
-we can find the real world position of each ball by multiplying the ray by the z_i divided by the ray's z value:
 ```
-position[i] = ray[i] * (z[i] / ray[i].z)
+positions[i] = rays[i] * distances[i]
 ```
+and use the distances we calculated in step 3.
 
 **for step 5.3-5.4, nothing interesting happens, we just calculate the camera's position relative to the average balls position, and then we find the pen tip position in the camera's coordinate system.**
 
@@ -258,23 +356,24 @@ We know that the line formed by the green ball and the blue ball is parallel to 
 
 To compute the z-axis, we cross the x-axis direction with the vector from the red ball to the blue ball.
 
-Finally, we can compute the y-axis direction by crossing the z-axis with the x-axis.
+Finally, we compute the y-axis direction by crossing the z-axis with the x-axis.
 
 ### Step 5.6: Convert Pen Tip Coordinates to World Coordinate System
-we can use the following formula to convert the pen tip coordinates from the camera's coordinate system to the world's coordinate system:
+We use the following formula to convert the pen tip coordinates from the camera's coordinate system to the world's coordinate system:
+
 source: https://en.wikipedia.org/wiki/Euclidean_vector#Conversion_between_multiple_Cartesian_bases
 
 $$
-x' = \text{x axis} \cdot pos
+x' = \text{x axis} \cdot \text{pos}
 $$
 $$
-y' = \text{y axis} \cdot pos
+y' = \text{y axis} \cdot \text{pos}
 $$
 $$
-z' = \text{z axis} \cdot pos
+z' = \text{z axis} \cdot \text{pos}
 $$
 
-where $x$, $y$, and $z$ are the pen tip coordinates in the camera's coordinate system, and $pos$ are the pen tip coordinates in the world's coordinate system.
+where $x'$, $y'$, and $z'$ are the pen tip coordinates in the world's coordinate system, and $\text{pos}$ are the pen tip coordinates in the camera's coordinate system.
 
 ### Step 5.7: Check if the Pen is Touching the Paper
 This project uses 2 different methods to check if the pen is touching the paper:

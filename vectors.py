@@ -5,7 +5,8 @@ Mathematical utilities for 3D geometry, camera calibration, and orientation esti
 
 import numpy as np
 
-def distance(v: np.ndarray, axis = None) -> float:
+
+def distance(v: np.ndarray, axis=None) -> float:
     """
     Calculate the Euclidean distance (L2 norm) of a vector.
     Args:
@@ -13,10 +14,10 @@ def distance(v: np.ndarray, axis = None) -> float:
     Returns:
         float: The Euclidean distance of the vector.
     """
-    return np.linalg.norm(v, axis = axis, keepdims=True)
+    return np.linalg.norm(v, axis=axis, keepdims=True)
 
 
-def normalize(v: np.ndarray, axis = None) -> np.ndarray:
+def normalize(v: np.ndarray, axis=None) -> np.ndarray:
     """
     Normalize a vector to unit length.
     Args:
@@ -24,10 +25,12 @@ def normalize(v: np.ndarray, axis = None) -> np.ndarray:
     Returns:
         numpy.ndarray: The normalized vector.
     """
-    return v / distance(v, axis = axis)
+    return v / distance(v, axis=axis)
 
 
-def calibrate_focal_length(*points: np.ndarray, initial_z: float, initial_dst: float) -> float:
+def calibrate_focal_length(
+    *points: np.ndarray, initial_z: float, initial_dst: float
+) -> float:
     """
     Calibrates the focal length of the camera based on the positions of the balls.
     Args:
@@ -67,7 +70,7 @@ def get_rays(projected_points: np.ndarray, vw: int, vh: int, f: float) -> np.nda
     projected_points = np.asarray(projected_points)
     rays = np.empty((projected_points.shape[0], 3))
     rays[:, 0] = projected_points[:, 0] - vw / 2
-    rays[:, 1] = - (projected_points[:, 1] - vh / 2)
+    rays[:, 1] = -(projected_points[:, 1] - vh / 2)
     rays[:, 2] = -f
     return normalize(rays, axis=1)
 
@@ -106,10 +109,9 @@ def get_orientation(b1: np.ndarray, b2: np.ndarray, b3: np.ndarray) -> tuple:
     return x_axis, y_axis, z_axis
 
 
-def orient_pos(pos: np.ndarray,
-               x_axis: np.ndarray,
-               y_axis: np.ndarray,
-               z_axis: np.ndarray) -> np.ndarray:
+def orient_pos(
+    pos: np.ndarray, x_axis: np.ndarray, y_axis: np.ndarray, z_axis: np.ndarray
+) -> np.ndarray:
     """
     Orient a position vector to the triangle's orientation defined by its axes.
     Args:
@@ -120,13 +122,18 @@ def orient_pos(pos: np.ndarray,
     Returns:
         numpy.ndarray: The oriented position vector.
     """
-    return np.array([
-        np.dot(pos, x_axis),
-        np.dot(pos, y_axis),
-        np.dot(pos, z_axis),
-    ])
+    return np.array(
+        [
+            np.dot(pos, x_axis),
+            np.dot(pos, y_axis),
+            np.dot(pos, z_axis),
+        ]
+    )
 
-def find_angle_bisectors(p1s: np.ndarray, p2s: np.ndarray, vw: int, vh: int, f: float, ball_radius: int) -> tuple:
+
+def find_angle_bisectors(
+    p1s: np.ndarray, p2s: np.ndarray, vw: int, vh: int, f: float, ball_radius: int
+) -> tuple:
     """
     find the angle bisectors between rays p1s and p2s.
     Args:
@@ -137,24 +144,28 @@ def find_angle_bisectors(p1s: np.ndarray, p2s: np.ndarray, vw: int, vh: int, f: 
     Returns:
         numpy.ndarray: An array of shape (N, 3) containing the rays in 3D space,
                       where N is the number of balls.
-                      
+
         numpy.ndarray: An array of shape (N,) containing the lengths of the bisectors.
     """
     r1s = get_rays(p1s, vw, vh, f)
     r2s = get_rays(p2s, vw, vh, f)
-    c = normalize(np.sum([r1s, r2s], axis=0), axis=1)  # Average the rays to find angle bisectors
+    c = normalize(
+        np.sum([r1s, r2s], axis=0), axis=1
+    )  # Average the rays to find angle bisectors
     dot_products = np.sum(c * r1s, axis=1)
-    sin_ = np.sqrt(1 - dot_products ** 2)
+    sin_ = np.sqrt(1 - dot_products**2)
     L = ball_radius / sin_  # Length of the bisectors
     return c, L
 
+
 def distance_from_area(A: float, R: float) -> float:
     """
-    A    : fractional area 
+    A    : fractional area
     R    : actual sphere radius in same linear units as D
     returns D: distance from pinhole to sphere center
     """
-    return R / np.sqrt(1-(1-2*A)**2)
+    return R / np.sqrt(1 - (1 - 2 * A) ** 2)
+
 
 def area_fraction_image(
     w: int, h: int, cx: float, cy: float, f: float, dx: float = 1.0, dy: float = 1.0

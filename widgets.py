@@ -43,32 +43,36 @@ class Root:
         y = self.padding
         rows = [[]]
         for i, c in enumerate(self.children):
-            rows[-1].append({
-                'i':i,
-                'y':y
-                })
-            
+            rows[-1].append({"i": i, "y": y})
+
             y += self.children[i].req_height + self.padding
-            if i + 1 < len(self.children) and \
-               y + self.children[i + 1].req_height + self.padding > sh:
+            if (
+                i + 1 < len(self.children)
+                and y + self.children[i + 1].req_height + self.padding > sh
+            ):
                 y = self.padding
                 rows.append([])
-                
+
         x = sw - self.padding
-        
+
         self.child_bbox = []
         for i in rows:
             for j in i:
-                self.child_bbox.append(pg.Rect(x - self.children[j['i']].req_width,
-                                               j['y'],
-                                               self.children[j['i']].req_width,
-                                               self.children[j['i']].req_height))
-                
-            x -= max(self.children[j['i']].req_width for j in i) + self.padding
+                self.child_bbox.append(
+                    pg.Rect(
+                        x - self.children[j["i"]].req_width,
+                        j["y"],
+                        self.children[j["i"]].req_width,
+                        self.children[j["i"]].req_height,
+                    )
+                )
+
+            x -= max(self.children[j["i"]].req_width for j in i) + self.padding
 
         for i, c in enumerate(self.children):
             c.bbox = self.child_bbox[i]
             c.update_layout()
+
     def process_event(self, event: pg.event.Event) -> None:
         """
         Processes events for all widgets.
@@ -353,6 +357,7 @@ class Slider(BaseWidget):
         track_color: tuple[int, int, int] = (100, 100, 100),
         req_width: int = 200,
         req_height: int = 20,
+        integer_only=False,
     ):
         """
         :param min_val: minimum slider value
@@ -374,6 +379,7 @@ class Slider(BaseWidget):
         self.thumb_color = thumb_color
         self.thumb_width = req_height  # Thumb is square, so width == height
         self.thumb_height = req_height
+        self.integer_only = integer_only
 
         self.dragging = False
 
@@ -393,7 +399,10 @@ class Slider(BaseWidget):
         left = self.bbox.left + self.thumb_width // 2
         right = self.bbox.right - self.thumb_width // 2
         frac = (x - left) / (right - left)
-        return max(self.min, min(self.max, self.min + frac * (self.max - self.min)))
+        value = max(self.min, min(self.max, self.min + frac * (self.max - self.min)))
+        if self.integer_only:
+            value = round(value)
+        return value
 
     def process_event(self, event: pg.event.Event) -> bool:
         """
@@ -545,8 +554,9 @@ class RadioButtons(BaseWidget):
                 )
                 if rect.collidepoint(mx, my):
                     self.selected = i
-                    break
+                    return True
                 y += self.font.get_height() + self.spacing
+        return False
 
     def render(self, screen: pg.Surface) -> None:
         super().render(screen)
@@ -654,8 +664,9 @@ class Checkboxes(BaseWidget):
                 )
                 if rect.collidepoint(mx, my):
                     self.checked[i] = not self.checked[i]
-                    break
+                    return True
                 y += self.font.get_height() + self.spacing
+        return False
 
     def render(self, screen: pg.Surface) -> None:
         super().render(screen)
@@ -786,7 +797,7 @@ class SettingsWidget(TitledWidget):
         :param title: the title text to display at the top of the widget
 
         Each dictionary should have a "type" key with one of the following values:
-        - "slider": for a slider, with keys "min", "max", "value", and "name"
+        - "slider": for a slider, with keys "min", "max", "value", "integer_only", and "name"
         - "radio": for a radio button group, with keys "options", "selected", and "name"
         - "button": for a button, with keys "name" and optionally "onclick"
         """
@@ -836,7 +847,11 @@ class SettingsWidget(TitledWidget):
                     align="right",
                 )
                 slider = Slider(
-                    self, min_val=attr["min"], max_val=attr["max"], value=attr["value"]
+                    self,
+                    min_val=attr["min"],
+                    max_val=attr["max"],
+                    value=attr["value"],
+                    integer_only=attr.get("integer_only", False),
                 )
                 self.req_height += (
                     label.req_height
@@ -907,9 +922,7 @@ class SettingsWidget(TitledWidget):
                     self,
                     text=attr.get("name", "Button"),
                     on_click=attr.get("onclick"),
-                    req_width=(
-                        req_width - 2 * self.padding
-                    ),
+                    req_width=(req_width - 2 * self.padding),
                 )
                 self.req_height += button.req_height + self.padding
                 self.settings_widgets.append({"type": "button", "button": button})
@@ -921,119 +934,129 @@ class SettingsWidget(TitledWidget):
         super().update_layout()
 
         y = self.in_bbox.top
-        for s, a in zip(self.settings_widgets, self.attributes):
-            if s["type"] == "slider":
-                s["slider"].min = a["min"]
-                s["slider"].max = a["max"]
-                s["slider"].value = a["value"]
-                s["label"].text = a.get("name", "Unnamed Slider")
-                s["min_label"].text = str(a["min"])
-                s["max_label"].text = str(a["max"])
-                s["value_label"].text = f"{a['value']:.2f}"
-                for c in s["label"], s["value_label"], s["slider"]:
+        for widget, attr in zip(self.settings_widgets, self.attributes):
+            if widget["type"] == "slider":
+                widget["slider"].min = attr["min"]
+                widget["slider"].max = attr["max"]
+                widget["slider"].value = attr["value"]
+                widget["slider"].integer_only = attr.get("integer_only", False)
+                widget["label"].text = attr.get("name", "Unnamed Slider")
+                widget["min_label"].text = str(attr["min"])
+                widget["max_label"].text = str(attr["max"])
+                if widget["slider"].integer_only:
+                    widget["value_label"].text = f"{attr['value']:d}"
+                else:
+                    widget["value_label"].text = f"{attr['value']:.2f}"
+                for c in widget["label"], widget["value_label"], widget["slider"]:
                     bbox = pg.Rect(
                         self.in_bbox.left, y, self.in_bbox.width, c.req_height
                     )
-                    if c == s["value_label"]:
-                        s["value_label"].bbox = s["min_label"].bbox = s[
+                    if c == widget["value_label"]:
+                        widget["value_label"].bbox = widget["min_label"].bbox = widget[
                             "max_label"
                         ].bbox = bbox
                     else:
                         c.bbox = bbox
                     y += c.req_height + self.padding
-            elif s["type"] == "radio":
-                s["label"].text = a.get("name", "Unnamed Radio")
-                new_options = a.get("options", [])
-                s["radio"].selected = a.get("selected", -1)
-                old_labels = s["radio"].labels
+            elif widget["type"] == "radio":
+                widget["label"].text = attr.get("name", "Unnamed Radio")
+                new_options = attr.get("options", [])
+                widget["radio"].selected = attr.get("selected", -1)
+                old_labels = widget["radio"].labels
 
                 # Remove extra labels if options decreased
                 if len(new_options) < len(old_labels):
                     for _ in range(len(old_labels) - len(new_options)):
-                        label = s["radio"].labels.pop()
-                        if label in s["radio"].children:
-                            s["radio"].children.remove(label)
-                        if label in s["radio"].parent.children:
-                            s["radio"].parent.children.remove(label)
+                        label = widget["radio"].labels.pop()
+                        if label in widget["radio"].children:
+                            widget["radio"].children.remove(label)
+                        if label in widget["radio"].parent.children:
+                            widget["radio"].parent.children.remove(label)
                 # Add new labels if options increased
                 elif len(new_options) > len(old_labels):
                     for i in range(len(old_labels), len(new_options)):
                         label = Label(
-                            s["radio"],
-                            font=s["radio"].font,
+                            widget["radio"],
+                            font=widget["radio"].font,
                             text=new_options[i],
                             background=None,
-                            foreground=s["radio"].foreground,
+                            foreground=widget["radio"].foreground,
                             align="left",
                         )
-                        s["radio"].labels.append(label)
+                        widget["radio"].labels.append(label)
                 # Update label texts for all options
-                for label, option in zip(s["radio"].labels, new_options):
+                for label, option in zip(widget["radio"].labels, new_options):
                     label.text = option
-                s["radio"].options = new_options
+                widget["radio"].options = new_options
                 # Update the radio title label
-                s["label"].text = a.get("name", "Unnamed Radio")
+                widget["label"].text = attr.get("name", "Unnamed Radio")
                 # Place label
-                s["label"].bbox = pg.Rect(
-                    self.in_bbox.left, y, self.in_bbox.width, s["label"].req_height
+                widget["label"].bbox = pg.Rect(
+                    self.in_bbox.left, y, self.in_bbox.width, widget["label"].req_height
                 )
-                y += s["label"].req_height + self.padding
+                y += widget["label"].req_height + self.padding
                 # Place radio group
-                s["radio"].bbox = pg.Rect(
-                    self.in_bbox.left, y, self.in_bbox.width, s["radio"].req_height
+                widget["radio"].bbox = pg.Rect(
+                    self.in_bbox.left, y, self.in_bbox.width, widget["radio"].req_height
                 )
-                s["radio"].update_layout()
-                y += s["radio"].req_height + self.padding
-            elif s["type"] == "checkmark":
-                s["label"].text = a.get("name", "Unnamed Radio")
-                new_options = a.get("options", [])
-                new_checked = a.get("checked", [False] * len(new_options))
-                old_labels = s["checkmarks"].labels
+                widget["radio"].update_layout()
+                y += widget["radio"].req_height + self.padding
+            elif widget["type"] == "checkmark":
+                widget["label"].text = attr.get("name", "Unnamed Radio")
+                new_options = attr.get("options", [])
+                new_checked = attr.get("checked", [False] * len(new_options))
+                old_labels = widget["checkmarks"].labels
 
                 # Remove extra labels if options decreased
                 if len(new_options) < len(old_labels):
                     for _ in range(len(old_labels) - len(new_options)):
-                        label = s["checkmarks"].labels.pop()
-                        if label in s["checkmarks"].children:
-                            s["checkmarks"].children.remove(label)
-                        if label in s["checkmarks"].parent.children:
-                            s["checkmarks"].parent.children.remove(label)
+                        label = widget["checkmarks"].labels.pop()
+                        if label in widget["checkmarks"].children:
+                            widget["checkmarks"].children.remove(label)
+                        if label in widget["checkmarks"].parent.children:
+                            widget["checkmarks"].parent.children.remove(label)
                 # Add new labels if options increased
                 elif len(new_options) > len(old_labels):
                     for i in range(len(old_labels), len(new_options)):
                         label = Label(
-                            s["checkmarks"],
-                            font=s["checkmarks"].font,
+                            widget["checkmarks"],
+                            font=widget["checkmarks"].font,
                             text=new_options[i],
                             background=None,
-                            foreground=s["checkmarks"].foreground,
+                            foreground=widget["checkmarks"].foreground,
                             align="left",
                         )
-                        s["checkmarks"].labels.append(label)
+                        widget["checkmarks"].labels.append(label)
                 # Update label texts for all options
-                for label, option in zip(s["checkmarks"].labels, new_options):
+                for label, option in zip(widget["checkmarks"].labels, new_options):
                     label.text = option
-                s["checkmarks"].options = new_options
-                s["checkmarks"].checked = new_checked[:]
+                widget["checkmarks"].options = new_options
+                widget["checkmarks"].checked = new_checked[:]
                 # Place label
-                s["label"].bbox = pg.Rect(
-                    self.in_bbox.left, y, self.in_bbox.width, s["label"].req_height
+                widget["label"].bbox = pg.Rect(
+                    self.in_bbox.left, y, self.in_bbox.width, widget["label"].req_height
                 )
-                y += s["label"].req_height + self.padding
+                y += widget["label"].req_height + self.padding
                 # Place checkmarks group
-                s["checkmarks"].bbox = pg.Rect(
-                    self.in_bbox.left, y, self.in_bbox.width, s["checkmarks"].req_height
+                widget["checkmarks"].bbox = pg.Rect(
+                    self.in_bbox.left,
+                    y,
+                    self.in_bbox.width,
+                    widget["checkmarks"].req_height,
                 )
-                s["checkmarks"].update_layout()
-                y += s["checkmarks"].req_height + self.padding
-            elif s["type"] == "button":
-                s["button"].text = a.get("name", "Button")
-                s["button"].on_click = a["onclick"]
-                s["button"].bbox = pg.Rect(
-                    self.in_bbox.left, y, self.in_bbox.width, s["button"].req_height
+                widget["checkmarks"].update_layout()
+                y += widget["checkmarks"].req_height + self.padding
+            elif widget["type"] == "button":
+                widget["button"].text = attr.get("name", "Button")
+                widget["button"].on_click = attr["onclick"]
+                widget["button"].bbox = pg.Rect(
+                    self.in_bbox.left,
+                    y,
+                    self.in_bbox.width,
+                    widget["button"].req_height,
                 )
-                s["button"].update_layout()
-                y += s["button"].req_height + self.padding
+                widget["button"].update_layout()
+                y += widget["button"].req_height + self.padding
         self.req_height = y - self.bbox.top
 
     def process_event(self, event: pg.event.Event) -> bool:
@@ -1041,25 +1064,28 @@ class SettingsWidget(TitledWidget):
         Processes events for all sliders, radios, and buttons in this widget.
         :param event: pygame event to process
         """
+        overall_changed = False
         for i, s in enumerate(self.settings_widgets):
             if s["type"] == "slider":
                 slider = s["slider"]
                 changed = slider.process_event(event)
                 if changed:
                     self.attributes[i]["value"] = slider.value
-                    s["value_label"].text = f"{slider.value:.2f}"
+                    overall_changed = True
             elif s["type"] == "radio":
-                prev_selected = s["radio"].selected
-                s["radio"].process_event(event)
-                if s["radio"].selected != prev_selected:
+                changed = s["radio"].process_event(event)
+                if changed:
                     self.attributes[i]["selected"] = s["radio"].selected
+                    overall_changed = True
             elif s["type"] == "checkmark":
-                prev_checked = s["checkmarks"].checked[:]
-                s["checkmarks"].process_event(event)
-                if s["checkmarks"].checked != prev_checked:
+                changed = s["checkmarks"].process_event(event)
+                if changed:
                     self.attributes[i]["checked"] = s["checkmarks"].checked[:]
+                    overall_changed = True
             elif s["type"] == "button":
                 s["button"].process_event(event)
+        if overall_changed:
+            self.update_layout()
 
 
 class AxisWidget(TitledWidget):
@@ -1259,7 +1285,7 @@ class ImageWidget(TitledWidget):
 
 
 if __name__ == "__main__":
-    screen = pg.display.set_mode((800, 600), pg.RESIZABLE)
+    screen = pg.display.set_mode((800, 800), pg.RESIZABLE)
     pg.display.set_caption("Widget Example")
 
     clock = pg.time.Clock()
@@ -1294,22 +1320,35 @@ if __name__ == "__main__":
                 "type": "radio",
                 "name": "Ellipse correction method",
                 "options": ["Weighted pixels", "Tangential point", "None"],
-                "selected": 0
+                "selected": 0,
             },
             {
                 "type": "radio",
                 "name": "Pen down detection method",
                 "options": ["Audio", "Pen-y position"],
-                "selected": 0
+                "selected": 0,
             },
             {
                 "type": "radio",
                 "name": "Position evaluation method",
                 "options": ["Trilateration", "Triangulation"],
-                "selected": 0
+                "selected": 0,
             },
-            {"type": "slider", "min": 1, "max": 100, "value": 75, "name": "Pixel saturation threshold (in percent)"},
-            {"type": "slider", "min": 0, "max": 255, "value": 90, "name": "Pixel lightness threshold (0-255)"},
+            {
+                "type": "slider",
+                "min": 1,
+                "max": 100,
+                "value": 75,
+                "name": "Pixel saturation threshold (in percent)",
+            },
+            {
+                "type": "slider",
+                "min": 0,
+                "max": 255,
+                "value": 90,
+                "name": "Pixel lightness threshold (0-255)",
+                "integer_only": 1,
+            },
             {"type": "button", "name": "Start", "onclick": None},
         ],
         title="Settings",

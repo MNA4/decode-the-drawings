@@ -41,7 +41,7 @@ IGNORE_AUDIO = (
 )
 TANGENTIAL_ELLIPSE_CORRECTION = (
     False  # If True, use tangential points for ellipse correction,
-           # Else use weighted average to correct ellipse distortion.
+    # Else use weighted average to correct ellipse distortion.
 )
 WEIGHT_PIXELS = True
 USE_LINE_MASK = False
@@ -57,7 +57,7 @@ PEN_THRESHOLD = (
 )
 INITIAL_Z = 18  # Initial Z distance (cm) for calibration
 PEN_LENGTH = 18  # Length of the pen (cm)
-INITIAL_DST = 9  # Initial distance between balls (cm)
+BALL_DST = 9  # Initial distance between balls (cm)
 BALL_RADIUS = 3
 INV_SATURATION_THRESHOLD = 100 / PIXEL_SATURATION_THRESHOLD
 
@@ -87,7 +87,7 @@ ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
 
 # Calibrate focal length using initial positions
 focal_length = calibrate_focal_length(
-    *ball_projected_pos, initial_z=INITIAL_Z, initial_dst=INITIAL_DST
+    *ball_projected_pos, initial_z=INITIAL_Z, initial_dst=BALL_DST
 )
 
 # Estimate actual ball radius if not ignored
@@ -159,18 +159,18 @@ while STATUS != "quit":
                 )
                 ball_rays = get_rays(ball_projected_pos, width, height, focal_length)
             else:
-                ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
+                ball_projected_pos, ball_projected_radius = get_all_balls(
+                    threshold_array
+                )
                 ball_rays = get_rays(ball_projected_pos, width, height, focal_length)
 
             if IGNORE_BALL_RADIUS:
                 # Use geometric constraint to solve for scale factors
-                scale_factors = compute_ts(*ball_rays, INITIAL_DST)
+                scale_factors = compute_ts(*ball_rays, BALL_DST)
             elif TANGENTIAL_ELLIPSE_CORRECTION:
                 scale_factors = distances
             elif WEIGHT_PIXELS:
-                scale_factors = distance_from_area(
-                    ball_fractional_area, BALL_RADIUS
-                )
+                scale_factors = distance_from_area(ball_fractional_area, BALL_RADIUS)
             else:
                 # Use projected and actual radii to solve for scale factors
                 z = ball_actual_radius / ball_projected_radius * focal_length
