@@ -116,11 +116,11 @@ To correct the ball’s elliptical distortion, we calculate the weighted average
 
 According to [wikipedia](https://en.wikipedia.org/wiki/Solid_angle):
 > The solid angle for an arbitrary oriented surface S subtended at a point P is equal to the solid angle of the projection of the surface S to the unit sphere with center P, which can be calculated as the surface integral:
+>
 > $$
 > \Omega = \iint_S d \Omega = \iint_S \frac{\vec{r} \cdot \hat{n}}{r^3} \, dS
 > $$
 >
-> 
 > where $\hat{r} = \frac{\vec{r}}{r}$ is the unit vector corresponding to $\vec{r}$, the position vector of an infinitesimal surface element $dS$ with respect to point $P$ and where $\hat{n}$ represents the unit normal vector to $dS$.
 >
 
@@ -203,7 +203,7 @@ for most cameras, the principal point is at the center of the image, so `princip
 ### Step 5.2: Distance Estimation
 This project uses 2 different methods to estimate the distance between the camera and each ball:
 
-#### Method 1: using law of cosines to calculate the distance between the camera and each ball based on the angles between the rays pointing to each ball.
+#### Method 1: using law of cosines to calculate the distance between the camera and each ball based on the angles between the rays pointing to each ball (triangulation)
 
 Suppose we have three rays $r_1$, $r_2$, and $r_3$ pointing to the centers of the three balls, distances $t_1$, $t_2$, and $t_3$ such that $r_i t_i$ gives the position of ball $i$ in the camera's coordinate system, and angles $\theta_{12}$, $\theta_{23}$, and $\theta_{31}$ where $\theta_{ij}$ is the angle between rays $r_i$ and $r_j$. We then obtain the following symmetric equations:
 
@@ -232,7 +232,7 @@ we can find the real world position of each ball by multiplying the ray by the d
 position[i] = ray[i] * t[i]
 ```
 
-#### Method 2: Using the projected radius of the ball in the image frame.
+#### Method 2: Using the projected radius of the ball in the image frame (trilateration)
 
 *Image 2: Tangential Rays*
 
@@ -244,7 +244,7 @@ $$
 z_i = \frac{\text{focal length} \times \text{actual radius}}{\text{projected radius}}
 $$
 
-where $\text{focal length}$ is the focal length calculated in step 4.1, $\text{actual radius}$ is the real-world radius of the ball, and $\text{projected radius}$ is the radius of the ball in the image frame.
+where $\text{focal length}$ is the focal length calculated in step 4.1, $\text{actual radius}$ is the physical radius of the ball, and $\text{projected radius}$ is the radius of the ball in the image frame.
 
 we can find the real world position of each ball by multiplying the ray by the z_i divided by the ray's z value:
 ```
