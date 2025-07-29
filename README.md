@@ -181,7 +181,7 @@ $$
 In our pinhole‐camera model, $\hat n=(0,0,1)$ and
 
 $$
-\vec r = \bigl(x - c_x,\;y - c_y,\;f\bigr),
+\vec r = \bigl(x - c_x,y - c_y,f\bigr),
 $$
 
 so
@@ -230,6 +230,8 @@ To get the ball’s fractional area, we sum the fractional areas of all nonzero 
 $$
 \text{ball fractional area} = \sum{\text{pixel fractional area}}
 $$
+
+This method handles the ellipse distortion correctly, while still giving minimal noise. this method gives the best results so far.
 
 ##### Calculating the distance between each ball and the camera with given fractional area
 
