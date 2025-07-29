@@ -46,7 +46,7 @@ Here's a more detailed explanation of the steps:
 
 I'm using the `av` library to read the video frames and extract the audio track. The frames are yielded as numpy arrays for further processing.
 
-### Step 2: Thresholding the frames
+### Step 2: Threshold the frames
 
 To separate the ball pixels from the background, I apply color thresholding using numpy. I've tried several methods, but currently it uses the following approach:
 
@@ -101,6 +101,7 @@ And use the equation $\text{area}=\pi r^2$ to get each ball's projected radii.
 
 However, the ball actually got distorted. which means its actually an ellipse, not a circle. this causes inaccuracy when computing the ball's positions.
 #### Method 2: ball's tangential point
+
 We know that a sphere projected by a pinhole camera model results in an ellipse pointing towards the principal point. ([Inigo Quilez made an excellent proof here](https://iquilezles.org/articles/sphereproj/))
 
 We can find 2 points that are tangential to each ball, by calculating the closest & furthest nonzero pixel from the principal point, and find the angle bisector between the 2 tangential rays. 
@@ -186,7 +187,7 @@ $$
 
 where $\text{projected length}$ is the distance between the projected centers of the balls in the image frame, $z$ is the estimated z-value from the camera to the balls, and $\text{actual length}$ is the actual distance between the balls in the real world.
 
-### Step 5.1: Compute Rays
+### Step 5.1: Computing The Rays
 Here, I used the pinhole camera model to compute the rays that point to the center of each ball. The rays are calculated using the formula:
 
 source: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays.html
@@ -232,6 +233,11 @@ position[i] = ray[i] * t[i]
 ```
 
 #### Method 2: Using the projected radius of the ball in the image frame.
+
+*Image 2: Tangential Rays*
+
+![Image 2: Tangential Rays](https://raw.githubusercontent.com/MNA4/decode-the-drawings/main/images/tangential_rays.png)
+
 source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
 
 $$
