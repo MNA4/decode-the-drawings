@@ -988,8 +988,6 @@ class SettingsWidget(TitledWidget):
                 for label, option in zip(widget["radio"].labels, new_options):
                     label.text = option
                 widget["radio"].options = new_options
-                # Update the radio title label
-                widget["label"].text = attr.get("name", "Unnamed Radio")
                 # Place label
                 widget["label"].bbox = pg.Rect(
                     self.in_bbox.left, y, self.in_bbox.width, widget["label"].req_height
@@ -1002,7 +1000,7 @@ class SettingsWidget(TitledWidget):
                 widget["radio"].update_layout()
                 y += widget["radio"].req_height + self.padding
             elif widget["type"] == "checkmark":
-                widget["label"].text = attr.get("name", "Unnamed Radio")
+                widget["label"].text = attr.get("name", "Unnamed Checkmark")
                 new_options = attr.get("options", [])
                 new_checked = attr.get("checked", [False] * len(new_options))
                 old_labels = widget["checkmarks"].labels
@@ -1261,11 +1259,9 @@ class ImageWidget(TitledWidget):
         mins = pts.min(axis=0)
         maxs = pts.max(axis=0)
         wh = maxs - mins
-        # Avoid division by zero
-        denom = np.max(wh)
-        if denom == 0:
-            denom = 1
-        scale = min(draw_bbox.width, draw_bbox.height) / denom
+        scale = min(draw_bbox.width  / max(wh[0], 1),
+                    draw_bbox.height / max(wh[1], 1))
+        
         center = np.array(draw_bbox.center)
         # Draw current position
         current_pos = (

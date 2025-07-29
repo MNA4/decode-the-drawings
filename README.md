@@ -129,7 +129,7 @@ We find the angle bisector between the 2 tangential rays. this angle bisector sh
 
 This method handles the ellipse distortion pretty well, but it causes too much noise to be useful.
 
-##### Calculating the distance from each ball to the camera with given tangential rays
+##### Calculating the distance between each ball and the camera with given tangential rays
 
 *Image 2: Tangential Rays*
 
@@ -231,7 +231,7 @@ $$
 \text{ball fractional area} = \sum{\text{pixel fractional area}}
 $$
 
-##### Calculating the distance from each ball to the camera with given fractional area
+##### Calculating the distance between each ball and the camera with given fractional area
 
 *Image 3: Spherical cap*
 
@@ -415,7 +415,7 @@ python script.py
 - For best results, use a video with clear, well-separated colored balls and minimal background clutter.
 
 ## TODO
-- [ ] Improve ball detection using more robust methods (e.g., ellipse fitting).
+- [x] Improve ball detection using more robust methods (e.g., ellipse fitting).
 - [ ] Allow user to change parameters via UI.
 - [ ] Use neural network to correct error in pen tip coordinates.
 ## License
