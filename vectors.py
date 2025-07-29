@@ -148,10 +148,9 @@ def find_angle_bisectors(p1s: np.ndarray, p2s: np.ndarray, vw: int, vh: int, f: 
     L = ball_radius / sin_  # Length of the bisectors
     return c, L
 
-def distance_from_area(A: float, f: float, R: float) -> float:
+def distance_from_area(A: float, R: float) -> float:
     """
     A    : fractional area 
-    f    : focal length in pixels
     R    : actual sphere radius in same linear units as D
     returns D: distance from pinhole to sphere center
     """
@@ -171,14 +170,11 @@ def area_fraction_image(
     # Generate coordinate grids (w, h) with numpy.indices
     xm, ym = np.indices((w, h))  # shape (2, w, h)
 
-    # Squared distance from optical axis for each pixel
-    r2 = (xm - cx) ** 2 + (ym - cy) ** 2
-
-    # Denominator term: (r2 + f^2)^(3/2)
-    denom = (r2 + f**2) ** 1.5
+    # ray's length
+    l = np.sqrt((xm - cx) ** 2 + (ym - cy) ** 2 + f**2)
 
     # Differential solid angle for each pixel
-    d_omega = f * (dx * dy) / denom
+    d_omega = f * (dx * dy) / l**3
 
     # Fraction of full sphere = dΩ / (4π)
     return d_omega / (4 * np.pi)

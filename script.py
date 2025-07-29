@@ -41,11 +41,11 @@ IGNORE_AUDIO = (
 )
 TANGENTIAL_ELLIPSE_CORRECTION = (
     False  # If True, use tangential points for ellipse correction,
+           # Else use weighted average to correct ellipse distortion.
 )
-# Else use weighted average to correct ellipse distortion.
 WEIGHT_PIXELS = True
 USE_LINE_MASK = False
-VIDEO_PATH = "videos/3.mp4"  # Path to input video
+VIDEO_PATH = "videos/1.mp4"  # Path to input video
 OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
 PADDING = 10  # Padding for UI widgets
 FPS = 60  # Target frames per second
@@ -153,30 +153,28 @@ while STATUS != "quit":
                     focal_length,
                     ball_actual_radius,
                 )
+            elif WEIGHT_PIXELS:
+                ball_projected_pos, ball_fractional_area = get_all_balls_weighted(
+                    threshold_array, focal_length
+                )
+                ball_rays = get_rays(ball_projected_pos, width, height, focal_length)
             else:
-                if WEIGHT_PIXELS:
-                    ball_projected_pos, ball_fractional_area = get_all_balls_weighted(
-                        threshold_array, focal_length
-                    )
-                else:
-                    ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
-                    
+                ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
                 ball_rays = get_rays(ball_projected_pos, width, height, focal_length)
 
             if IGNORE_BALL_RADIUS:
                 # Use geometric constraint to solve for scale factors
                 scale_factors = compute_ts(*ball_rays, INITIAL_DST)
+            elif TANGENTIAL_ELLIPSE_CORRECTION:
+                scale_factors = distances
+            elif WEIGHT_PIXELS:
+                scale_factors = distance_from_area(
+                    ball_fractional_area, BALL_RADIUS
+                )
             else:
-                if TANGENTIAL_ELLIPSE_CORRECTION:
-                    scale_factors = distances
-                elif WEIGHT_PIXELS:
-                    scale_factors = distance_from_area(
-                        ball_fractional_area, focal_length, BALL_RADIUS
-                    )
-                else:
-                    # Use projected and actual radii to solve for scale factors
-                    z = ball_actual_radius / ball_projected_radius * focal_length
-                    scale_factors = -z / ball_rays[:, 2]
+                # Use projected and actual radii to solve for scale factors
+                z = ball_actual_radius / ball_projected_radius * focal_length
+                scale_factors = -z / ball_rays[:, 2]
 
             ball_actual_pos = ball_rays * scale_factors[:, np.newaxis]
             # Compute orientation of the triangle formed by the balls

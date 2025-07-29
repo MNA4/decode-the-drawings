@@ -40,27 +40,35 @@ class Root:
             return
 
         sw, sh = self.screen.get_size()
-        max_w = max(self.children, key=lambda x: x.req_width).req_width
-        pos = [sw - max_w - self.padding, self.padding]
-
+        y = self.padding
+        rows = [[]]
+        for i, c in enumerate(self.children):
+            rows[-1].append({
+                'i':i,
+                'y':y
+                })
+            
+            y += self.children[i].req_height + self.padding
+            if i + 1 < len(self.children) and \
+               y + self.children[i + 1].req_height + self.padding > sh:
+                y = self.padding
+                rows.append([])
+                
+        x = sw - self.padding
+        
         self.child_bbox = []
-        for i, c in enumerate(self.children[:-1]):
-
-            self.child_bbox.append(pg.Rect(pos, (c.req_width, c.req_height)))
-
-            pos[1] += c.req_height + self.padding
-            if pos[1] + self.children[i + 1].req_height + self.padding > sh:
-                pos[1] = self.padding
-                pos[0] -= max_w + self.padding
-
-        self.child_bbox.append(
-            pg.Rect(pos, (self.children[-1].req_width, self.children[-1].req_height))
-        )
+        for i in rows:
+            for j in i:
+                self.child_bbox.append(pg.Rect(x - self.children[j['i']].req_width,
+                                               j['y'],
+                                               self.children[j['i']].req_width,
+                                               self.children[j['i']].req_height))
+                
+            x -= max(self.children[j['i']].req_width for j in i) + self.padding
 
         for i, c in enumerate(self.children):
             c.bbox = self.child_bbox[i]
             c.update_layout()
-
     def process_event(self, event: pg.event.Event) -> None:
         """
         Processes events for all widgets.
@@ -778,8 +786,8 @@ class SettingsWidget(TitledWidget):
         :param title: the title text to display at the top of the widget
 
         Each dictionary should have a "type" key with one of the following values:
-        - "slider": for a slider, with keys "min", "max", "value", and optionally "name"
-        - "radio": for a radio button group, with keys "options", "selected", and optionally "name"
+        - "slider": for a slider, with keys "min", "max", "value", and "name"
+        - "radio": for a radio button group, with keys "options", "selected", and "name"
         - "button": for a button, with keys "name" and optionally "onclick"
         """
         super().__init__(
@@ -792,7 +800,7 @@ class SettingsWidget(TitledWidget):
             title=title,
         )
         self.settings_widgets = []
-        self.req_height = self.title_font.get_height()
+        self.req_height = self.title_font.get_height() + 2 * self.padding
         self.attributes = attributes
         for attr in self.attributes:
             if attr["type"] == "slider":
@@ -834,7 +842,7 @@ class SettingsWidget(TitledWidget):
                     label.req_height
                     + value_label.req_height
                     + slider.req_height
-                    + self.padding * 4
+                    + self.padding * 3
                 )
                 self.settings_widgets.append(
                     {
@@ -900,7 +908,7 @@ class SettingsWidget(TitledWidget):
                     text=attr.get("name", "Button"),
                     on_click=attr.get("onclick"),
                     req_width=(
-                        req_width - 2 * self.padding if self.padding else req_width
+                        req_width - 2 * self.padding
                     ),
                 )
                 self.req_height += button.req_height + self.padding
@@ -1251,7 +1259,7 @@ class ImageWidget(TitledWidget):
 
 
 if __name__ == "__main__":
-    screen = pg.display.set_mode((640, 480), pg.RESIZABLE)
+    screen = pg.display.set_mode((800, 600), pg.RESIZABLE)
     pg.display.set_caption("Widget Example")
 
     clock = pg.time.Clock()
@@ -1275,6 +1283,34 @@ if __name__ == "__main__":
                 "options": ["A", "B", "C"],
                 "checked": [True, False, False],
             },
+        ],
+        title="Settings",
+    )
+    settings2 = SettingsWidget(
+        root,
+        req_width=300,
+        attributes=[
+            {
+                "type": "radio",
+                "name": "Ellipse correction method",
+                "options": ["Weighted pixels", "Tangential point", "None"],
+                "selected": 0
+            },
+            {
+                "type": "radio",
+                "name": "Pen down detection method",
+                "options": ["Audio", "Pen-y position"],
+                "selected": 0
+            },
+            {
+                "type": "radio",
+                "name": "Position evaluation method",
+                "options": ["Trilateration", "Triangulation"],
+                "selected": 0
+            },
+            {"type": "slider", "min": 1, "max": 100, "value": 75, "name": "Pixel saturation threshold (in percent)"},
+            {"type": "slider", "min": 0, "max": 255, "value": 90, "name": "Pixel lightness threshold (0-255)"},
+            {"type": "button", "name": "Start", "onclick": None},
         ],
         title="Settings",
     )
