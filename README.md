@@ -2,7 +2,7 @@
 
 Radu's "Decode the Drawings" challenge is a fun challenge where you try to reconstruct a drawing by analyzing a video of three colored balls moving in space.
 
-more info can be found here: [Decode the Drawings](https://radufromfinland.com/decodeTheDrawings/)
+More info can be found here: [Decode the Drawings](https://radufromfinland.com/decodeTheDrawings/)
 
 This project is a solution to Radu's "Decode the Drawings" challenge. It uses computer vision and audio processing to track three colored balls in a video, estimate their 3D positions, compute the orientation of the triangle they form, and infer the pen tip position for drawing. The results are visualized in a custom Pygame UI and optionally saved to a file.
 
@@ -16,7 +16,7 @@ Note: In this project, I'm using the right handed coordinate system for the came
 | +z   | out of camera |
 | -z   | into scene    |
 
-the world's coordinate system used in this project is shown below:
+The world's coordinate system used in this project is shown below:
 
 *Image 1: World Coordinate System (Credit to Radu for the original image)*
 
@@ -93,7 +93,7 @@ for i, color in enumerate(colors):
 ### Step 3: Calculate Projected Center Positions and Radii
 After thresholding, we calculate the projected center position and radius of each ball in the image frame. 
 
-This project uses 3 different ways to calculate the ball's projected center & its distance from the camera:
+This project uses 3 different ways to calculate the ball's projected center & its projected radius from the camera:
 #### Method 1: unweighted pixel's average coordinate & area
 To approximate the projected center of each ball, we could just calculate the average nonzero pixels' coordinate.
 
@@ -101,7 +101,7 @@ And use the equation $\text{area}=\pi r^2$ to get each ball's projected radii.
 
 However, the ball actually got distorted. which means its actually an ellipse, not a circle. this causes inaccuracy when computing the ball's positions.
 
-##### Calculating the distance from each ball to the camera with given physical & projected radius
+##### Calculating the distance between each ball and the camera with given physical & projected radius
 
 We use the following formula to get the z position of the ball with given camera focal length and the ball's physical & projected radius:
 
@@ -123,9 +123,9 @@ distances[i] = (z[i] / ray[i].z)
 
 We know that a sphere projected by a pinhole camera model results in an ellipse pointing towards the principal point. ([Inigo Quilez made an excellent proof here](https://iquilezles.org/articles/sphereproj/))
 
-We can find 2 points that are tangential to each ball, by calculating the closest & furthest nonzero pixel from the principal point, and find the angle bisector between the 2 tangential rays. 
+With this knowledge, we can find 2 points that are tangential to each ball, by calculating the closest & furthest nonzero pixel from the principal point.
 
-The angle bisector we just calculated should point directly to the center of each ball. 
+We find the angle bisector between the 2 tangential rays. this angle bisector should point directly to the center of each ball. 
 
 This method handles the ellipse distortion pretty well, but it causes too much noise to be useful.
 
@@ -140,7 +140,6 @@ Suppose $\hat{C}$ is the unit ray pointing from the camera to the ball, and $\ha
 $$
 \begin{align}
 \hat{P} \cdot \hat{C} &= \cos{\theta} = \frac{OP}{OC}, \\
-
 \frac{PC}{OC} &= \sin{\theta} \\
               &= \sqrt{1-\cos^2{\theta}} \\
               &= \sqrt{1-(\hat{P} \cdot \hat{C})^2}, \\
@@ -251,7 +250,6 @@ In a unit sphere, $r = 1$. so:
 $$
 \begin{align}
 A&=2\pi (1-\cos \theta ) \text{ (in steradians)} \\
-
 A&=\frac{1}{2} (1-\cos \theta ) \text{ (in fractional area)}
 \end{align}
 $$
