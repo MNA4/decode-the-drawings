@@ -8,7 +8,6 @@ and infers the pen tip position for drawing.
 Results are visualized and optionally saved.
 """
 
-import time
 import numpy as np
 import pygame as pg
 from widgets import Root, ImageWidget, AxisWidget
@@ -30,37 +29,77 @@ from vectors import (
     distance_from_area,
 )
 
+from smoothing import median_line_smoothing
 # ----------------------
 # Configuration
 # ----------------------
-IGNORE_BALL_RADIUS = (
-    False  # If True, use the law of cosines; else, estimate from ball projected radius.
-)
+
+# Input & Output Paths
+
+VIDEO_PATH = "videos/3.mp4"  # Path to input video
+OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
+
+
+
+# Ellipse Correction Method
+
+TANGENTIAL_ELLIPSE_CORRECTION = False # If True, use tangential points for ellipse correction.
+USE_LINE_MASK = False # Use a line mask for tangential ellipse correction
+
+WEIGHTED_PIXELS_ELLIPSE_CORRECTION = True # If True, use weighted average for ellipse correction.
+
+
+
+# Pen Down Detection Method
+
 IGNORE_AUDIO = (
     False  # If True, use pen-y coordinate to detect pen-down; else, use audio intensity
 )
-TANGENTIAL_ELLIPSE_CORRECTION = (
-    False  # If True, use tangential points for ellipse correction,
-    # Else use weighted average to correct ellipse distortion.
-)
-WEIGHT_PIXELS = True
-USE_LINE_MASK = False
-VIDEO_PATH = "videos/1.mp4"  # Path to input video
-OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
-PADDING = 10  # Padding for UI widgets
-FPS = 60  # Target frames per second
-PIXEL_SATURATION_THRESHOLD = 75  # Threshold for ball detection (in percent)
-PIXEL_LIGHTNESS_THRESHOLD = 90  # Threshold for lightness detection (0-255)
+
 AUDIO_THRESHOLD = 0.0013  # Threshold for pen-down audio detection
 PEN_THRESHOLD = (
     1  # Threshold for pen tip y-coordinate to consider it touching the paper
 )
+
+
+
+# Camera-to-ball Distance Calculation Method
+
+IGNORE_BALL_RADIUS = (
+    False  # If True, use the law of cosines; else, estimate from ball projected radius.
+)
+
+
+
+# Frame Thresholding
+
+PIXEL_SATURATION_THRESHOLD = 75  # Threshold for ball detection (in percent)
+PIXEL_LIGHTNESS_THRESHOLD = 90  # Threshold for lightness detection (0-255)
+
+
+
+# Smoothing Constant
+SMOOTHING_CONSTANT = 10
+
+
+
+# App Settings
+
+PADDING = 10  # Padding for UI widgets
+FPS = 60  # Target frames per second
+
+
+
+# Setup dimensions
+
 INITIAL_Z = 18  # Initial Z distance (cm) for calibration
 PEN_LENGTH = 18  # Length of the pen (cm)
 BALL_DST = 9  # Initial distance between balls (cm)
 BALL_RADIUS = 3
-INV_SATURATION_THRESHOLD = 100 / PIXEL_SATURATION_THRESHOLD
 
+# Precomputed value
+
+INV_SATURATION_THRESHOLD = 100 / PIXEL_SATURATION_THRESHOLD
 
 def save_pixels(pixels, filename):
     """
@@ -92,7 +131,7 @@ focal_length = calibrate_focal_length(
 
 # Estimate actual ball radius if not ignored
 ball_actual_radius = BALL_RADIUS
-if not IGNORE_BALL_RADIUS and not WEIGHT_PIXELS:
+if not IGNORE_BALL_RADIUS and not WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
     # The balls may have a slightly different radius than assumed
     ball_actual_radius = ball_projected_radius * INITIAL_Z / focal_length
 
@@ -107,7 +146,8 @@ axis_widget = AxisWidget(
 image_widget = ImageWidget(root, pixels=[], curr_pos=(0, 0))
 root.update_layout()
 clock = pg.time.Clock()
-pixels = []  # List of pen tip positions
+points = []  # List of pen tip positions
+paths = [[]]
 
 # ----------------------
 # Main Loop
@@ -123,8 +163,11 @@ while STATUS != "quit":
         try:
             frame_array, aud_array = next(video)
         except StopIteration:
-            save_pixels(pixels, OUTPUT_FILENAME)
-            STATUS = "saving"
+            paths[-1] = median_line_smoothing(paths[-1], 10)
+            points = [i for sublist in paths for i in sublist]
+            image_widget.set_data(points, None)
+            save_pixels(points, OUTPUT_FILENAME)
+            STATUS = "saved"
             continue
 
         pen_down = True
@@ -153,7 +196,7 @@ while STATUS != "quit":
                     focal_length,
                     ball_actual_radius,
                 )
-            elif WEIGHT_PIXELS:
+            elif WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
                 ball_projected_pos, ball_fractional_area = get_all_balls_weighted(
                     threshold_array, focal_length
                 )
@@ -169,7 +212,7 @@ while STATUS != "quit":
                 scale_factors = compute_ts(*ball_rays, BALL_DST)
             elif TANGENTIAL_ELLIPSE_CORRECTION:
                 scale_factors = distances
-            elif WEIGHT_PIXELS:
+            elif WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
                 scale_factors = distance_from_area(ball_fractional_area, BALL_RADIUS)
             else:
                 # Use projected and actual radii to solve for scale factors
@@ -190,14 +233,21 @@ while STATUS != "quit":
 
             # Update UI widgets
             axis_widget.set_axes(x_axis, y_axis, z_axis)
-            image_widget.set_data(pixels, (pen_tip[0], pen_tip[2]))
+            image_widget.set_data(points, (pen_tip[0], pen_tip[2]))
 
             if IGNORE_AUDIO:
                 if pen_tip[1] >= -PEN_LENGTH + PEN_THRESHOLD:
                     pen_down = False
 
         if pen_down:
-            pixels.append((pen_tip[0], pen_tip[2]))
+            points.append((pen_tip[0], pen_tip[2]))
+            paths[-1].append((pen_tip[0], pen_tip[2]))
+        else:
+            if len(paths[-1]) > 0:
+                paths[-1] = median_line_smoothing(paths[-1], SMOOTHING_CONSTANT)
+                points = [i for sublist in paths for i in sublist]
+                paths.append([])
+                image_widget.set_data(points, None)
 
     # ----------------------
     # Drawing
@@ -212,7 +262,7 @@ while STATUS != "quit":
         else:
             for j in range(3):
                 pg.draw.circle(screen, (255, 255, 255), ball_projected_pos[j], 10)
-                if WEIGHT_PIXELS:
+                if WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
                     continue
                 pg.draw.circle(
                     screen,

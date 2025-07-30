@@ -218,7 +218,7 @@ $$
 And we weight each pixel based on their fractional area to get each ball's projected center:
 ```py
 
-weights = PIXEL_AREAS
+weights = PIXEL_FRACTIONAL_AREAS
 
 # weighted centroid using np.average
 ball_projected_center_x = np.average(ball_x_pixels, weights=weights)
@@ -325,7 +325,7 @@ $$
 
 where $s$ is the distance between each pair of balls in the real world.
 
-We can solve these equations for $t_1$, $t_2$, and $t_3$, and obtain the following equations:
+We can solve these equations for $t_1$, $t_2$, and $t_3$, and obtain the following equations (I used AI with this part):
 
 $$
 \begin{aligned}
@@ -347,7 +347,7 @@ Again, here we use the formula
 ```
 positions[i] = rays[i] * distances[i]
 ```
-and use the distances we calculated in step 3.
+and calculate the distance using the formula we just solved in step 3.
 
 **for step 5.3-5.4, nothing interesting happens, we just calculate the camera's position relative to the average balls position, and then we find the pen tip position in the camera's coordinate system.**
 

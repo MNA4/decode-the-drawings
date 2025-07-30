@@ -815,6 +815,7 @@ class SettingsWidget(TitledWidget):
         self.attributes = attributes
         for attr in self.attributes:
             if attr["type"] == "slider":
+                integer_only = attr.get("integer_only", False)
                 label = Label(
                     self,
                     font=self.settings_font,
@@ -833,7 +834,7 @@ class SettingsWidget(TitledWidget):
                 value_label = Label(
                     self,
                     font=self.settings_label_font,
-                    text=str(attr["value"]),
+                    text=("%d" if integer_only else "%.4g") % attr["value"],
                     background=None,
                     foreground=self.foreground,
                     align="center",
@@ -851,7 +852,7 @@ class SettingsWidget(TitledWidget):
                     min_val=attr["min"],
                     max_val=attr["max"],
                     value=attr["value"],
-                    integer_only=attr.get("integer_only", False),
+                    integer_only=integer_only,
                 )
                 self.req_height += (
                     label.req_height
@@ -946,7 +947,7 @@ class SettingsWidget(TitledWidget):
                 if widget["slider"].integer_only:
                     widget["value_label"].text = f"{attr['value']:d}"
                 else:
-                    widget["value_label"].text = f"{attr['value']:.2f}"
+                    widget["value_label"].text = f"{attr['value']:.4g}"
                 for c in widget["label"], widget["value_label"], widget["slider"]:
                     bbox = pg.Rect(
                         self.in_bbox.left, y, self.in_bbox.width, c.req_height
@@ -1215,13 +1216,15 @@ class ImageWidget(TitledWidget):
         self.show_checkbox_y_offset = 0  # Will be set in update_layout
 
     def set_data(
-        self, pixels: list[tuple[int, int]], curr_pos: tuple[int, int]
+        self, pixels: list[tuple[int, int]] = None, curr_pos: tuple[int, int] = None
     ) -> None:
         """
         Update the list of pixels and current position.
         """
-        self.pixels = [tuple(p) for p in pixels]
-        self.curr_pos = tuple(curr_pos)
+        if pixels is not None:
+            self.pixels = [tuple(p) for p in pixels]
+        if curr_pos is not None:
+            self.curr_pos = tuple(curr_pos)
 
     def update_layout(self) -> None:
         super().update_layout()
@@ -1315,19 +1318,34 @@ if __name__ == "__main__":
             {
                 "type": "radio",
                 "name": "Ellipse correction method",
-                "options": ["Weighted pixels", "Tangential point", "None"],
+                "options": ["Weighted pixels",
+                            "Tangential point (with line mask)",
+                            "Tangential point (without line mask)",
+                            "None"
+                            ],
                 "selected": 0,
             },
             {
                 "type": "radio",
                 "name": "Pen down detection method",
-                "options": ["Audio", "Pen-y position"],
+                "options": ["Audio",
+                            "Pen-y position"
+                            ],
                 "selected": 0,
+            },
+            {
+                "type": "slider",
+                "min":   0,
+                "max":   0.0025,
+                "value": 0.0013,
+                "name": "Audio threshold",
             },
             {
                 "type": "radio",
                 "name": "Position evaluation method",
-                "options": ["Trilateration", "Triangulation"],
+                "options": ["Trilateration",
+                            "Triangulation"
+                            ],
                 "selected": 0,
             },
             {
@@ -1336,6 +1354,7 @@ if __name__ == "__main__":
                 "max": 100,
                 "value": 75,
                 "name": "Pixel saturation threshold (in percent)",
+                "integer_only": 0,
             },
             {
                 "type": "slider",

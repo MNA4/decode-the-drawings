@@ -135,7 +135,7 @@ def find_angle_bisectors(
     p1s: np.ndarray, p2s: np.ndarray, vw: int, vh: int, f: float, ball_radius: int
 ) -> tuple:
     """
-    find the angle bisectors between rays p1s and p2s.
+    Find the angle bisectors between rays p1s and p2s.
     Args:
         p1s, p2s (numpy.ndarray): where rays that point to p1s and p2s are tangential to the balls.
         vw (int): The width of the viewport.
