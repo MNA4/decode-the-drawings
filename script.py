@@ -86,7 +86,7 @@ PIXEL_LIGHTNESS_THRESHOLD = 90  # Threshold for lightness detection (0-255)
 
 
 # Smoothing Constant
-SMOOTHING_CONSTANT = 1
+SMOOTHING_CONSTANT = 4
 
 
 
@@ -95,7 +95,9 @@ SMOOTHING_CONSTANT = 1
 PADDING = 10  # Padding for UI widgets
 FPS = 60  # Target frames per second
 DEBUG_BALLS = False
-SKIP_FRAMES = 100
+SKIP_FRAMES = 0
+
+
 
 # Setup dimensions
 

@@ -510,7 +510,7 @@ This is used to calibrate the camera's focal length.
 
 set the `CAM_HORIZONTAL_FOV` to None, if you want the program to calibrate focal length automatically. otherwise it will use the equation `focal = (resolution / 2) / (tan(fov) / 2)`
 
-`DST_CALIB_CONSTANT` is used to fine tune the distortion in the image.
+`DST_CALIB_CONSTANT` is used to fine tune the distortions that are present in the image.
 
 ## File Overview
 - `script.py` — Main application logic and UI

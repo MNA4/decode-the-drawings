@@ -31,8 +31,6 @@ RAYS_CACHE = None
 PIXEL_AREA_CACHE = None
 PIXEL_WEIGHT_CACHE = None
 F_CACHE = None
-GRID_X = None
-GRID_Y = None
 
 def get_all_balls_weighted(threshold_array: np.ndarray, f: float) -> tuple:
     """
@@ -45,30 +43,31 @@ def get_all_balls_weighted(threshold_array: np.ndarray, f: float) -> tuple:
         pos (np.ndarray): shape (3,2) of each ball's weighted centroid (x,y,z).
         radius (np.ndarray): shape (3,), the ball's fractional area on the unit sphere.
     """
-    global PIXEL_AREA_CACHE, PIXEL_WEIGHT_CACHE, F_CACHE, GRID_X, GRID_Y
+    global PIXEL_AREA_CACHE, PIXEL_WEIGHT_CACHE, F_CACHE
     w, h = threshold_array.shape[:2]
     cx = w / 2  # or your actual principal-point
     cy = h / 2
     # lazily build the area‐fraction cache if needed
     if PIXEL_AREA_CACHE is None or PIXEL_AREA_CACHE.shape != (w, h) or F_CACHE != f:
-        GRID_X, GRID_Y = np.indices(threshold_array.shape[:2])
+        x, y = np.indices(threshold_array.shape[:2])
         PIXEL_AREA_CACHE = area_fraction_image(w, h, cx, cy, f)
         F_CACHE = f
-        ray_length = np.sqrt((GRID_X - cx)**2 + (GRID_Y - cy)**2 + f**2)
+        ray_length = np.sqrt((x - cx)**2 + (y - cy)**2 + f**2)
         PIXEL_WEIGHT_CACHE = PIXEL_AREA_CACHE / ray_length
 
     pos = np.zeros((3, 2), dtype=float)
     A = np.zeros(3, dtype=float)
 
     for i in range(3):
-        mask = threshold_array[:, :, i]
-        weights = PIXEL_AREA_CACHE * mask
+        xs, ys = np.nonzero(threshold_array[:, :, i])
+        weight_area = PIXEL_AREA_CACHE[xs,ys]
+        weight_pixel = PIXEL_WEIGHT_CACHE[xs,ys]
         
-        total = weights.sum()
+        pos[i, 0] = np.average(xs, weights = weight_pixel)
+        pos[i, 1] = np.average(ys, weights = weight_pixel)
+        
+        total = weight_area.sum()
         A[i] = total
-
-        pos[i, 0] = (weights * GRID_X).sum() / total
-        pos[i, 1] = (weights * GRID_Y).sum() / total
         
     return pos, A
 
