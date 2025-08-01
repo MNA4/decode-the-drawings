@@ -37,7 +37,7 @@ from smoothing import median_line_smoothing
 
 # Input & Output Paths
 
-VIDEO_PATH = "videos/3.mp4"  # Path to input video
+VIDEO_PATH = "videos/2.mp4"  # Path to input video
 OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
 
 
@@ -139,7 +139,7 @@ if CAM_HORIZONTAL_FOV is None:
     )
 else:
     FOCAL_LENGTH = (CAM_RESOLUTION[0] / 2) / np.tan(CAM_HORIZONTAL_FOV / 2 * (np.pi / 180))
-    
+
 # Estimate actual ball radius if not ignored
 ball_actual_radius = BALL_RADIUS
 if not IGNORE_BALL_RADIUS and not WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
@@ -213,9 +213,10 @@ while STATUS != "quit":
                     ball_actual_radius,
                 )
             elif WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
-                ball_rays, ball_fractional_area = get_all_balls_weighted(
+                ball_projected_pos, ball_fractional_area = get_all_balls_weighted(
                     threshold_array, FOCAL_LENGTH
                 )
+                ball_rays = get_rays(ball_projected_pos, width, height, FOCAL_LENGTH)
             else:
                 ball_projected_pos, ball_projected_radius = get_all_balls(
                     threshold_array

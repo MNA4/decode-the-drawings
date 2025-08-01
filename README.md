@@ -26,18 +26,19 @@ Here's the program's logic:
 
 1. Get the video frames and audio from the input video.
 2. Detect the three colored balls in each frame using color thresholding.
-3. Calculate the projected center positions and radii of each ball in the image frame.
-4. For the first frame, we do the following:
+3. For the first frame, we do the following:
     1. Calculate the camera's focal length by comparing the projected distance between each pair of balls and their actual given distances. This allows the program to construct a pinhole camera model.
     
-5. For the remaining frames, we do the following:
-    1. Calculate rays that point to the center of each ball.
-    2. Estimate the distance between the camera and each ball, and use the formula `position = ray * distance` to calculate the position of each ball as viewed from the camera origin.
-    3. Calculate the camera's position relative to the average balls position,  in the camera's coordinate system. 
-    4. Calculate the pen tip position by subtracting the camera's y-position from the given pen length.
-    5. Compute the world's orientation (from the camera's point of view).
-    6. Convert the pen tip's coordinates from the camera's coordinate system to the world's coordinate system.
-    7. Check if the pen is touching the paper. if it is, save the pen tip coordinates to a list.
+4. For the remaining frames, we do the following:
+    1. Calculate the projected center positions & distances of each ball in the image frame.
+    2. Calculate rays that point to the center of each ball.
+    3. Estimate the distance between the camera and each ball, and use the formula `position = ray * distance` to calculate the position of each ball as viewed from the camera origin.
+    4. Calculate the camera's position relative to the average balls position,  in the camera's coordinate system. 
+    5. Calculate the pen tip position by subtracting the camera's y-position from the given pen length.
+    6. Compute the world's orientation (from the camera's point of view).
+    7. Convert the pen tip's coordinates from the camera's coordinate system to the world's coordinate system.
+    8. Check if the pen is touching the paper. if it is, save the pen tip coordinates to a list.
+5. Add smoothing to the pen tip coordinate to reduce noise.
 6. At the end of the video, save the pen tip coordinates to a file.
 
 Here's a more detailed explanation of the steps:
@@ -78,7 +79,7 @@ for i, color in enumerate(colors):
 
 Instead of looping through each pixel and checking the threshold, this project uses numpy's vectorized operations to apply the thresholding in one go. This significantly speeds up the processing time.
 
-UPDATE: after reviewing the threshold array, i realized that there are a lot noise coming from low lightness pixels, so I added a lightness threshold to filter out these pixels. The new thresholding algorithm looks like this:
+**UPDATE:** after reviewing the threshold array, i realized that there are a lot noise coming from low lightness pixels, so I added a lightness threshold to filter out these pixels. The new thresholding algorithm looks like this:
 
 ```py
 inv_saturation_threshold = 1 / saturation_threshold  # precompute the inverse of the threshold
@@ -90,8 +91,36 @@ for i, color in enumerate(colors):
         # where i is the index of the color (0 for red, 1 for green, 2 for blue)
 ```
 
-### Step 3: Calculate Projected Center Positions and Radii
-After thresholding, we calculate the projected center position and radius of each ball in the image frame. 
+
+
+### Step 3.1: Camera Calibration
+
+#### Method 1: use the distance between each ball's centroid
+To estimate the camera's focal length, we compare the distance between each pair of balls in the image frame (by calculating their center of mass) with their actual given distances.
+
+This allows the program to construct a pinhole camera model, which is essential for accurately estimating the 3D positions of the balls.
+
+The focal length is calculated using the formula:
+
+source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
+
+$$
+\text{focal length} = \frac{\text{projected length} \times z}{\text{actual length}}
+$$
+
+where $\text{projected length}$ is the distance between the projected centers of the balls in the image frame, $z$ is the estimated z-value from the camera to the balls, and $\text{actual length}$ is the actual distance between the balls in the real world.
+
+#### Method 2: using given FOV.
+
+We use the equation:
+
+$$
+\text{focal length} = \frac{(w \div 2)}{\tan(\text{horizontal FOV} \ div 2)}
+$$
+
+And use the given camera's horizontal FOV.
+
+### Step 4.1-4.2: Calculate Projected Center Positions, Radii, and Rays
 
 This project uses 3 different ways to calculate the ball's projected center & its projected radius from the camera:
 #### Method 1: unweighted pixel's average coordinate & area
@@ -118,6 +147,20 @@ And then we use the following formula to get the distance between the camera and
 ```
 distances[i] = (z[i] / ray[i].z)
 ```
+
+##### Calculating the rays
+To calculate the rays pointing from the camera to the center of each balls, I used the pinhole camera model. The rays are calculated using the formula:
+
+source: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays.html
+
+```
+ray = normalize(vec3(projected_x-principal_x, projected_y-principal_y, f))
+```
+
+where `projected_x` and `projected_y` are the x and y coordinates of the projected center of each ball in the image frame, `principal_x` and `principal_y` are the principal point coordinates, and `f` is the focal length calculated in step 4.1.
+
+This gives us a unit vector pointing from the camera to the center of each ball in the image frame (in the camera's coordinate system).
+for most cameras, the principal point is at the center of the image, so `principal_x` and `principal_y` are half the width and height of the image respectively.
 
 #### Method 2: ball's tangential point
 
@@ -157,6 +200,13 @@ Where:
 - $PC$ = ball's radius
 - $\hat{P}$ = unit tangent ray
 - $\hat{C}$ = unit camera‑to‑ball ray
+
+##### Calculating the rays
+We can find the angle bisector between 2 rays, by normalizing the sum of the 2 rays:
+
+```
+ray = normalize(ray0.x+ray1.x, ray0.y+ray1.y, ray0.z+ray1.z)
+```
 
 #### Method 3: weighted pixel's average coordinate & area
 
@@ -225,6 +275,19 @@ ball_projected_center_x = np.average(ball_x_pixels, weights=weights)
 ball_projected_center_y = np.average(ball_y_pixels, weights=weights)
 ```
 
+**UPDATE:** this isn't the correct way to find the ray's midpoint, since each rays have different length, so we must divide the weights by the ray's length:
+
+```py
+
+weights = PIXEL_FRACTIONAL_AREAS / ray_lengths
+
+# weighted centroid using np.average
+ball_projected_center_x = np.average(ball_x_pixels, weights=weights)
+ball_projected_center_y = np.average(ball_y_pixels, weights=weights)
+```
+
+Now this should give us the mathematically correct center of each ball.
+
 To get the ball’s fractional area, we sum the fractional areas of all nonzero pixels:
 
 $$
@@ -278,37 +341,11 @@ Where:
 - $PC$ = ball's radius
 - $A$ = ball's fractional area
 
-### Step 4.1: Camera Calibration
-**Unfortunately we must use method 1 (in step 3) for the camera focal-length calibration. since method 2 & 3 require the camera focal-length to be known in advance.**
+##### Calculating the rays
 
-We compare the average projected distance between each pair of balls in the image frame with their actual given distances to estimate the camera's focal length.
+Here, we use the same formula we used in method 1.
 
-This allows the program to construct a pinhole camera model, which is essential for accurately estimating the 3D positions of the balls.
-
-The focal length is calculated using the formula:
-
-source: https://en.wikipedia.org/wiki/Pinhole_camera_model#Formulation
-
-$$
-\text{focal length} = \frac{\text{projected length} \times z}{\text{actual length}}
-$$
-
-where $\text{projected length}$ is the distance between the projected centers of the balls in the image frame, $z$ is the estimated z-value from the camera to the balls, and $\text{actual length}$ is the actual distance between the balls in the real world.
-
-### Step 5.1: Computing The Rays
-Here, I used the pinhole camera model to compute the rays that point to the center of each ball. The rays are calculated using the formula:
-
-source: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays.html
-
-```
-ray = normalize(vec3(projected_x-principal_x, projected_y-principal_y, f))
-```
-
-where `projected_x` and `projected_y` are the x and y coordinates of the projected center of each ball in the image frame, `principal_x` and `principal_y` are the principal point coordinates, and `f` is the focal length calculated in step 4.1.
-
-This gives us a unit vector pointing from the camera to the center of each ball in the image frame (in the camera's coordinate system).
-for most cameras, the principal point is at the center of the image, so `principal_x` and `principal_y` are half the width and height of the image respectively.
-### Step 5.2: Distance Estimation
+### Step 4.3: Distance Estimation
 This project uses 2 different methods to estimate the distance between the camera and each ball:
 
 #### Method 1: using law of cosines to calculate the distance between the camera and each ball based on the angles between the rays pointing to each ball (triangulation)
@@ -335,7 +372,8 @@ t_3 &= \frac{s\,(1 - r_1\cdot r_2)}{\sqrt{\,2\,(1 - r_1\cdot r_2)\,(1 - r_2\cdot
 \end{aligned}
 $$
 
-we can find the real world position of each ball by multiplying the ray by the distance:
+We can find the real world position of each ball by multiplying the ray by the distance:
+
 ```
 positions[i] = rays[i] * t[i]
 ```
@@ -347,18 +385,19 @@ Again, here we use the formula
 ```
 positions[i] = rays[i] * distances[i]
 ```
-and calculate the distance using the formula we just solved in step 3.
 
-**for step 5.3-5.4, nothing interesting happens, we just calculate the camera's position relative to the average balls position, and then we find the pen tip position in the camera's coordinate system.**
+And calculate the distance using the formula we just solved in step 4.1-4.2.
 
-### Step 5.5: computing the world's orientation from the camera's point of view
+**for step 4.4-4.5, nothing interesting happens, we just calculate the camera's position relative to the average balls position, and then we find the pen tip position in the camera's coordinate system.**
+
+### Step 4.6: Computing the world's orientation from the camera's point of view
 We know that the line formed by the green ball and the blue ball is parallel to the x-axis in the world's coordinate system (see Image 1). So we can use the vector from the green ball to the blue ball to compute the world's x-axis direction.
 
 To compute the z-axis, we cross the x-axis direction with the vector from the red ball to the blue ball.
 
 Finally, we compute the y-axis direction by crossing the z-axis with the x-axis.
 
-### Step 5.6: Convert Pen Tip Coordinates to World Coordinate System
+### Step 4.6: Convert Pen Tip Coordinates to World Coordinate System
 We use the following formula to convert the pen tip coordinates from the camera's coordinate system to the world's coordinate system:
 
 source: https://en.wikipedia.org/wiki/Euclidean_vector#Conversion_between_multiple_Cartesian_bases
@@ -375,16 +414,21 @@ $$
 
 where $x'$, $y'$, and $z'$ are the pen tip coordinates in the world's coordinate system, and $\text{pos}$ are the pen tip coordinates in the camera's coordinate system.
 
-### Step 5.7: Check if the Pen is Touching the Paper
+### Step 4.7: Check if the Pen is Touching the Paper
 This project uses 2 different methods to check if the pen is touching the paper:
 #### Method 1: Using the Pen Length
-If the pen tip's y-coordinate in the world's coordinate system is less than or equal to the negative of the pen length (plus a threshold), then the pen is touching the paper. This is a simple check that works well for most cases.
+If the pen tip's y-coordinate in the world's coordinate system is less than or equal to the negative of the pen length (plus a threshold), then the pen is touching the paper.
 #### Method 2: Using audio intensity
 If the audio intensity is above a certain threshold, then the pen is touching the paper. This method is more robust, as it can detect the pen touching the paper even if the pen tip's y-coordinate is above the negative of the pen length. The audio intensity is calculated using the following formula:
 ```
 audio_intensity = rms(audio_samples)
 ```
 where `rms` is the root mean square of the audio samples, `audio_samples` is a list of audio samples from the audio track of the video, and `max_amplitude` is the maximum amplitude of the audio samples, and `audio_samples` is a list of audio samples from the audio track of the video.
+
+### Step 5: Smoothing the recovered image
+
+For now, we just calculate the median of the points every n points, where n is the smoothing constant.
+
 ## Requirements
 - Python 3.8+
 - numpy
@@ -444,6 +488,7 @@ adjust `SMOOTHING_CONSTANT` to set how smooth you want the path to be, minimum v
 set `PADDING` to the desired UI padding.
 set the `FPS` to something low, if you want low CPU load.
 set `DEBUG_BALLS` to True, to see the difference between the reconstructed & the real balls.
+set `SKIP_FRAMES` to something larger than 1, to see quick preview.
 
 ### 6. Setup Dimensions
 
