@@ -10,13 +10,14 @@ Results are visualized and optionally saved.
 
 import numpy as np
 import pygame as pg
-from widgets import Root, ImageWidget, AxisWidget
+from widgets import Root, ImageWidget, AxisWidget, Checkboxes
 from media import video_generator, audio_intensity
 from image_processing import (
     get_all_balls,
     threshold,
     get_tangential_points,
     get_all_balls_weighted,
+    render_ball,
 )
 
 from vectors import (
@@ -44,7 +45,7 @@ OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
 # Ellipse Correction Method
 
 TANGENTIAL_ELLIPSE_CORRECTION = False # If True, use tangential points for ellipse correction.
-USE_LINE_MASK = False # Use a line mask for tangential ellipse correction
+USE_LINE_MASK = True # Use a line mask for tangential ellipse correction
 
 WEIGHTED_PIXELS_ELLIPSE_CORRECTION = True # If True, use weighted average for ellipse correction.
 
@@ -79,7 +80,7 @@ PIXEL_LIGHTNESS_THRESHOLD = 90  # Threshold for lightness detection (0-255)
 
 
 # Smoothing Constant
-SMOOTHING_CONSTANT = 10
+SMOOTHING_CONSTANT = 1
 
 
 
@@ -87,15 +88,22 @@ SMOOTHING_CONSTANT = 10
 
 PADDING = 10  # Padding for UI widgets
 FPS = 60  # Target frames per second
-
-
+DEBUG_BALLS = False
+SKIP_FRAMES = 10
+#DST_CALIB_CONSTANT = [1.00044347, 0.985, 0.99606536]
+DST_CALIB_CONSTANT = [1, 0.99, 1]
 
 # Setup dimensions
 
-INITIAL_Z = 18  # Initial Z distance (cm) for calibration
+INITIAL_Z = 18  # Initial Z distance (between the camera & each balls) (cm)
 PEN_LENGTH = 18  # Length of the pen (cm)
 BALL_DST = 9  # Initial distance between balls (cm)
 BALL_RADIUS = 3
+
+# Camera Constants
+
+CAM_HORIZONTAL_FOV = 89#92.7 # FOV angle, in degrees
+CAM_RESOLUTION = 1280, 720
 
 # Precomputed value
 
@@ -124,16 +132,19 @@ threshold_array = threshold(
 )
 ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
 
-# Calibrate focal length using initial positions
-focal_length = calibrate_focal_length(
-    *ball_projected_pos, initial_z=INITIAL_Z, initial_dst=BALL_DST
-)
-
+if CAM_HORIZONTAL_FOV is None:
+    # Calibrate focal length using initial positions
+    FOCAL_LENGTH = calibrate_focal_length(
+        *ball_projected_pos, initial_z=INITIAL_Z, initial_dst=BALL_DST
+    )
+else:
+    FOCAL_LENGTH = (CAM_RESOLUTION[0] / 2) / np.tan(CAM_HORIZONTAL_FOV / 2 * (np.pi / 180))
+    
 # Estimate actual ball radius if not ignored
 ball_actual_radius = BALL_RADIUS
 if not IGNORE_BALL_RADIUS and not WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
     # The balls may have a slightly different radius than assumed
-    ball_actual_radius = ball_projected_radius * INITIAL_Z / focal_length
+    ball_actual_radius = ball_projected_radius * INITIAL_Z / FOCAL_LENGTH
 
 # Set up display and UI
 width = frame_array.shape[0]
@@ -144,6 +155,8 @@ axis_widget = AxisWidget(
     root, x=np.array((1, 0, 0)), y=np.array((0, 1, 0)), z=np.array((0, 0, 0))
 )
 image_widget = ImageWidget(root, pixels=[], curr_pos=(0, 0))
+checkboxes = Checkboxes(root, options = ['DEBUG BALLS'], checked = [DEBUG_BALLS], req_width=200, background=(255,255,255))
+
 root.update_layout()
 clock = pg.time.Clock()
 points = []  # List of pen tip positions
@@ -158,9 +171,12 @@ while STATUS != "quit":
         if event.type == pg.QUIT:
             STATUS = "quit"
         root.process_event(event)
+        DEBUG_BALLS = checkboxes.checked[0]
 
     if STATUS == "computing":
         try:
+            for i in range(SKIP_FRAMES):
+                next(video)
             frame_array, aud_array = next(video)
         except StopIteration:
             paths[-1] = median_line_smoothing(paths[-1], 10)
@@ -193,19 +209,18 @@ while STATUS != "quit":
                     ball_tangential_points[:, 1, :],
                     width,
                     height,
-                    focal_length,
+                    FOCAL_LENGTH,
                     ball_actual_radius,
                 )
             elif WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
-                ball_projected_pos, ball_fractional_area = get_all_balls_weighted(
-                    threshold_array, focal_length
+                ball_rays, ball_fractional_area = get_all_balls_weighted(
+                    threshold_array, FOCAL_LENGTH
                 )
-                ball_rays = get_rays(ball_projected_pos, width, height, focal_length)
             else:
                 ball_projected_pos, ball_projected_radius = get_all_balls(
                     threshold_array
                 )
-                ball_rays = get_rays(ball_projected_pos, width, height, focal_length)
+                ball_rays = get_rays(ball_projected_pos, width, height, FOCAL_LENGTH)
 
             if IGNORE_BALL_RADIUS:
                 # Use geometric constraint to solve for scale factors
@@ -216,9 +231,9 @@ while STATUS != "quit":
                 scale_factors = distance_from_area(ball_fractional_area, BALL_RADIUS)
             else:
                 # Use projected and actual radii to solve for scale factors
-                z = ball_actual_radius / ball_projected_radius * focal_length
+                z = ball_actual_radius / ball_projected_radius * FOCAL_LENGTH
                 scale_factors = -z / ball_rays[:, 2]
-
+            scale_factors = scale_factors * DST_CALIB_CONSTANT
             ball_actual_pos = ball_rays * scale_factors[:, np.newaxis]
             # Compute orientation of the triangle formed by the balls
             x_axis, y_axis, z_axis = get_orientation(
@@ -252,18 +267,23 @@ while STATUS != "quit":
     # ----------------------
     # Drawing
     # ----------------------
-    display_array = (threshold_array * 255).astype(np.uint8)
+    if DEBUG_BALLS:
+        multiplier = 100
+    else:
+        multiplier = 255
+    display_array = (threshold_array * multiplier).astype(np.uint8)
     pg.surfarray.blit_array(screen, display_array)
     if pen_down:
         if TANGENTIAL_ELLIPSE_CORRECTION:
             for j in ball_tangential_points:
                 for k in j:
                     pg.draw.circle(screen, (255, 255, 255), k, 10, 2)
-        else:
+                if USE_LINE_MASK:
+                    pg.draw.line(screen, (255,255,255), (width//2, height//2), k)
+                
+        elif not WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
             for j in range(3):
                 pg.draw.circle(screen, (255, 255, 255), ball_projected_pos[j], 10)
-                if WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
-                    continue
                 pg.draw.circle(
                     screen,
                     (255, 255, 255),
@@ -271,6 +291,21 @@ while STATUS != "quit":
                     ball_projected_radius[j],
                     5,
                 )
+                
+        if DEBUG_BALLS:
+            for j in range(3):
+                arr = np.not_equal(
+                        render_ball(ball_rays[j], BALL_RADIUS, scale_factors[j], width, height, FOCAL_LENGTH),
+                        threshold_array[:, :, j]
+                        ) * 255
+                surface = pg.surfarray.make_surface(arr)
+                screen.blit(surface, (0,0), special_flags=pg.BLEND_RGB_ADD)
+                
+        pg.draw.line(screen, (255, 255, 0), (width//2, 0),
+                                              (width//2, height))
+        pg.draw.line(screen, (255, 255, 0), (width, height//2),
+                                              (0, height//2))
+                
     # Render UI widgets
     root.render()
     pg.display.flip()

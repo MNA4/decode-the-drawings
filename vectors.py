@@ -74,6 +74,29 @@ def get_rays(projected_points: np.ndarray, vw: int, vh: int, f: float) -> np.nda
     rays[:, 2] = -f
     return normalize(rays, axis=1)
 
+def get_frame_rays(w, h, f) -> np.ndarray:
+    """
+    Calculate every rays inside the frame w x h.
+    Args:
+        w (int): The width of the frame.
+        h (int): The height of the frame.
+        f (float): The focal length of the camera.
+    Returns:
+        numpy.ndarray: An array of shape (w, h, 3), containing 
+    """
+
+    # Pinhole Camera Model:
+    # ray = (projected_x - viewport_width / 2, -(projected_y - viewport_height / 2), -f)
+    # The Y axis is flipped for a right-handed coordinate system.
+    # The Z axis is flipped, since the camera is pointing onto the scene.
+
+    xm, ym = np.indices((w, h))
+    cx, cy = w/2, h/2
+    rays = np.empty((w, h, 3))
+    rays[:, :, 0] =   xm - cx
+    rays[:, :, 1] = - (ym - cy)
+    rays[:, :, 2] = - f
+    return normalize(rays, axis=2)
 
 def compute_ts(r1: np.ndarray, r2: np.ndarray, r3: np.ndarray, side: float) -> tuple:
     """
@@ -106,6 +129,9 @@ def get_orientation(b1: np.ndarray, b2: np.ndarray, b3: np.ndarray) -> tuple:
     x_axis = normalize(b2 - b3)
     z_axis = normalize(np.cross(x_axis, b1 - b3))
     y_axis = normalize(np.cross(z_axis, x_axis))
+    
+    # y_axis = normalize(b1-(b2 + b3)/2)
+    # z_axis = normalize(np.cross(x_axis, y_axis))
     return x_axis, y_axis, z_axis
 
 

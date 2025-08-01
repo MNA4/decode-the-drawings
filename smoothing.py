@@ -13,7 +13,8 @@ def median_line_smoothing(path, smoothness):
         return []
     if len(path) <= smoothness:
         return [np.median(path, axis=0)]
-
+    if smoothness == 1:
+        return path
     new_path = []
     for i in range(len(path) - smoothness):
         new_path.append(np.median(path[i:i+smoothness], axis=0))

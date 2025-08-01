@@ -1,6 +1,9 @@
 import numpy as np
-from vectors import area_fraction_image
-
+from vectors import (
+    area_fraction_image,
+    get_frame_rays,
+    normalize
+)
 
 def get_all_balls(threshold_array: np.ndarray) -> tuple:
     """
@@ -24,10 +27,9 @@ def get_all_balls(threshold_array: np.ndarray) -> tuple:
         radius[i] = np.sqrt(ball_px[0].shape[0] / np.pi)
     return pos, radius
 
-
+RAYS_CACHE = None
 PIXEL_AREA_CACHE = None
 F_CACHE = None
-
 
 def get_all_balls_weighted(threshold_array: np.ndarray, f: float) -> tuple:
     """
@@ -37,10 +39,10 @@ def get_all_balls_weighted(threshold_array: np.ndarray, f: float) -> tuple:
         threshold_array (numpy.ndarray): shape (w, h, 3), boolean or 0/1 mask per color.
         f (float): focal length, same units as area_fraction_image expects.
     Returns:
-        pos (np.ndarray): shape (3,2) of weighted centroids (x,y).
-        radius (np.ndarray): shape (3,), the circle's apparent radii on the unit sphere.
+        rays (np.ndarray): shape (3,3) of unit rays pointing to each balls (x,y,z).
+        radius (np.ndarray): shape (3,), the circle's fractional area on the unit sphere.
     """
-    global PIXEL_AREA_CACHE, F_CACHE
+    global PIXEL_AREA_CACHE, F_CACHE, RAYS_CACHE
     w, h = threshold_array.shape[:2]
     cx = w / 2  # or your actual principal-point
     cy = h / 2
@@ -48,22 +50,35 @@ def get_all_balls_weighted(threshold_array: np.ndarray, f: float) -> tuple:
     if PIXEL_AREA_CACHE is None or PIXEL_AREA_CACHE.shape != (w, h) or F_CACHE != f:
         PIXEL_AREA_CACHE = area_fraction_image(w, h, cx, cy, f)
         F_CACHE = f
+        RAYS_CACHE = get_frame_rays(w, h, f)
 
-    pos = np.zeros((3, 2), dtype=float)
+    rays = np.zeros((3, 3), dtype=float)
     A = np.zeros(3, dtype=float)
 
     for i in range(3):
         xs, ys = np.nonzero(threshold_array[:, :, i])
-        weights = PIXEL_AREA_CACHE[xs, ys]
-
+        weights = PIXEL_AREA_CACHE[xs,ys]
+        ball_rays = RAYS_CACHE[xs,ys]
         # weighted centroid using np.average
-        pos[i, 0] = np.average(xs, weights=weights)
-        pos[i, 1] = np.average(ys, weights=weights)
-
-        # weighted area → radius on unit sphere
+        rays[i] = normalize(np.average(
+                                ball_rays,
+                                axis = 0,
+                                weights=weights
+                                )
+                            )
+        # weighted area
         A[i] = np.sum(weights)
-    return pos, A
+    return rays, A
 
+def render_ball(center, radius, distance, w, h, f):
+    "Used for debugging & finding errors in the program."
+    global F_CACHE, RAYS_CACHE
+    if RAYS_CACHE is None or RAYS_CACHE.shape != (w, h) or F_CACHE != f:
+        RAYS_CACHE = get_frame_rays(w, h, f)
+        F_CACHE = f
+    cos_ = np.sqrt(1-(radius/distance)**2)
+    dot_ = np.sum(RAYS_CACHE * center, axis = 2) - cos_
+    return dot_ > 0
 
 # Only cache 1 shape, to avoid memory issues
 DISTANCE_CACHE = None
@@ -139,30 +154,26 @@ def filter_line(p1, p2, nonzeros):
     return nonzeros[0][mask], nonzeros[1][mask]
 
 
-def threshold(
-    frame_array: np.ndarray, inv_saturation_threshold: float, lightness_threshold: float
-) -> np.ndarray:
+def threshold(frame: np.ndarray,
+              inv_saturation_threshold: float,
+              lightness_threshold: float) -> np.ndarray:
     """
     Apply a threshold to the frame array to create a binary mask.
     Args:
-        frame_array (numpy.ndarray): The video frame as a 3D numpy array (width, height, channels).
-        inv_saturation_threshold (float): The inverse of the saturation threshold for detecting ball pixels.
-                                          saturation threshold is in the range (0-1).
-        lightness_threshold (float): The lightness threshold for detecting ball pixels. (0-255)
+        frame (np.ndarray): The video frame as a 3D array (H, W, C).
+        inv_saturation_threshold (float): Inverse of the saturation threshold (0–1).
+        lightness_threshold (float): Lightness threshold (0–255).
     Returns:
-        numpy.ndarray: A 3D binary mask where pixels above the threshold are set to True.
+        np.ndarray: A boolean mask of shape (H, W, C).
     """
-    avg = (
-        np.sum(frame_array, axis=2, dtype=np.float32) * 0.3333
-    )  # float32 faster, avoids overflow
+    # 1) Compute per-pixel average (float32)
+    avg = frame.sum(axis=2, dtype=np.float32) * (1.0 / 3.0)
 
-    # Precompute scaled threshold
-    sat_thresh = (avg * inv_saturation_threshold).astype(
-        frame_array.dtype
-    )  # same type as frame for fast comp
+    # 2) Scale by inv_saturation_threshold and enforce the lightness floor
+    #    We get a float32 threshold map, then cast once to frame.dtype
+    per_pixel_thresh = np.maximum(avg * inv_saturation_threshold,
+                                  lightness_threshold).astype(frame.dtype)
 
-    # Vectorized threshold checks (no broadcasting temp arrays)
-    above_sat = frame_array > sat_thresh[:, :, None]
-    above_light = frame_array > lightness_threshold
-
-    return np.logical_and(above_sat, above_light)
+    # 3) Single vectorized comparison across channels
+    #    Broadcasting per_pixel_thresh from (H, W) → (H, W, 1)
+    return frame > per_pixel_thresh[:, :, None]

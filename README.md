@@ -398,11 +398,61 @@ pip install -r requirements.txt
 ## Usage
 1. Place your input video (e.g., `3.mp4`) in `./videos`.
 2. Adjust configuration parameters in `script.py` if needed (e.g., `VIDEO_PATH`, `PIXEL_THRESHOLD`, etc).
+   1. 
 3. Run the main script:
 ```
 python script.py
 ```
-4. The UI will display the video, detected balls, the world's axes, and the drawing. Pen tip coordinates are saved to `pixels.txt` when the video ends. however, you can change the output file name in `script.py` by changing the `OUTPUT_FILE` variable.
+
+### Settings the constants
+
+### 1. Input & Output files
+
+- `VIDEO_PATH` is the input video path. (.MP4, .MKV, .AVI,.MOV, WebM, etc.)
+- `OUTPUT_FILENAME` is the output file path. the program will put the (x,y) points of the recovered image here.
+
+### 2. Ellipse Correction method
+
+Set one or less of these constants to True:
+- `TANGENTIAL_ELLIPSE_CORRECTION`
+- `WEIGHTED_PIXELS_ELLIPSE_CORRECTION`
+
+If you use `TANGENTIAL_ELLIPSE_CORRECTION`, you have the option to use a line mask, `USE_LINE_MASK = True` (i originally added the line mask option cause i thought it would reduce the noise? but it somehow increased the noise)
+
+### 3. Pen Down Detection Method
+
+set `IGNORE_AUDIO` to False if you want to use audio for detecting pen downs.
+
+if you set `IGNORE_AUDIO` to False, use `AUDIO_THRESHOLD` to adjust the pen down threshold.
+Otherwise use `PEN_THRESHOLD` to adjust the pen threshold.
+
+### Distance Calculation Method
+
+set `IGNORE_BALL_RADIUS` to True if you want to use only angles to calculate distances.
+
+### Frame Thresholding
+
+- `PIXEL_SATURATION_THRESHOLD` is the saturation threshold. 100 means 100% saturated. setting this to zero will cause zero division error.
+- `PIXEL_LIGHTNESS_THRESHOLD` is the lightness threshold. 255 means pure white.
+
+### 4. Smoothing Constant
+
+adjust `SMOOTHING_CONSTANT` to set how smooth you want the path to be, minimum values is 1 (1 means no smoothing)
+
+### 5. App Settings
+
+set `PADDING` to the desired UI padding.
+set the `FPS` to something low, if you want low CPU load.
+set `DEBUG_BALLS` to True, to see the difference between the reconstructed & the real balls.
+
+### 6. Setup Dimensions
+
+Don't change this, unless you used a different setup dimensions.
+
+### 7. Camera Constants
+
+This is used to calibrate the camera's focal length.
+set the `CAM_HORIZONTAL_FOV` to None, if you want the program to calibrate focal length automatically. otherwise it will use the equation `focal = (resolution / 2) / (tan(fov) / 2)`
 
 ## File Overview
 - `script.py` — Main application logic and UI

@@ -193,6 +193,7 @@ class BaseWidget:
             self.children.append(children)
 
     def __del__(self):
+        print(self)
         if self.parent and self in self.parent.children:
             self.parent.children.remove(self)
 
@@ -466,7 +467,7 @@ class RadioButtons(BaseWidget):
     """
     A simple vertical list of radio buttons using Label widgets.
     """
-
+    font = pg.font.SysFont("consolas", 12, bold=False)
     def __init__(
         self,
         parent,
@@ -502,7 +503,8 @@ class RadioButtons(BaseWidget):
         )
         self.options = options
         self.selected = selected
-        self.font = font
+        if font:
+            self.font = font
         self.foreground = foreground
         self.spacing = spacing
         self.circle_radius = self.font.get_height() // 2
@@ -582,6 +584,7 @@ class Checkboxes(BaseWidget):
     """
     A vertical list of checkmarks (checkboxes).
     """
+    font = pg.font.SysFont("consolas", 12, bold=False)
 
     def __init__(
         self,
@@ -618,7 +621,8 @@ class Checkboxes(BaseWidget):
         )
         self.options = options
         self.checked = checked[:] if checked is not None else [False] * len(options)
-        self.font = font
+        if font:
+            self.font = font
         self.foreground = foreground
         self.spacing = spacing
         self.box_size = self.font.get_height()
