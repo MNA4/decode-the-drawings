@@ -86,7 +86,7 @@ PIXEL_LIGHTNESS_THRESHOLD = 90  # Threshold for lightness detection (0-255)
 
 
 # Smoothing Constant
-SMOOTHING_CONSTANT = 4
+SMOOTHING_CONSTANT = 10
 
 
 
