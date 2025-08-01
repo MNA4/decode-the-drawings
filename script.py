@@ -37,8 +37,14 @@ from smoothing import median_line_smoothing
 
 # Input & Output Paths
 
-VIDEO_PATH = "videos/2.mp4"  # Path to input video
-OUTPUT_FILENAME = "pixels.txt"  # Output file for pen tip coordinates
+QUEUE = [
+    {'input': 'videos/1.mp4', 'output': 'results/1.txt'},
+    {'input': 'videos/2.mp4', 'output': 'results/2.txt'},
+    {'input': 'videos/3.mp4', 'output': 'results/3.txt'},
+    {'input': 'videos/4.mp4', 'output': 'results/4.txt'},
+    {'input': 'videos/5.mp4', 'output': 'results/5.txt'},
+    {'input': 'videos/6.mp4', 'output': 'results/6.txt'},
+]
 
 
 
@@ -89,9 +95,7 @@ SMOOTHING_CONSTANT = 1
 PADDING = 10  # Padding for UI widgets
 FPS = 60  # Target frames per second
 DEBUG_BALLS = False
-SKIP_FRAMES = 10
-#DST_CALIB_CONSTANT = [1.00044347, 0.985, 0.99606536]
-DST_CALIB_CONSTANT = [1, 0.99, 1]
+SKIP_FRAMES = 100
 
 # Setup dimensions
 
@@ -102,8 +106,12 @@ BALL_RADIUS = 3
 
 # Camera Constants
 
-CAM_HORIZONTAL_FOV = 89#92.7 # FOV angle, in degrees
+# CAM_HORIZONTAL_FOV = 92.7 # FOV angle, in degrees
+CAM_HORIZONTAL_FOV = 89 # FOV angle, in degrees
 CAM_RESOLUTION = 1280, 720
+
+#DST_CALIB_CONSTANT = [1.00044347, 0.985, 0.99606536]
+DST_CALIB_CONSTANT = [1, 0.99, 1]
 
 # Precomputed value
 
@@ -123,42 +131,60 @@ def save_pixels(pixels, filename):
 # ----------------------
 # Initialization
 # ----------------------
-video = video_generator(VIDEO_PATH)
-frame_array, _ = next(video)  # Get first frame for setup
+
+queue_index = 0
+
+video = video_generator(QUEUE[queue_index]['input'])
+
+frame_array, _ = next(video)
 
 # Detect initial ball positions and radii
 threshold_array = threshold(
     frame_array, INV_SATURATION_THRESHOLD, PIXEL_LIGHTNESS_THRESHOLD
 )
+
 ball_projected_pos, ball_projected_radius = get_all_balls(threshold_array)
 
 if CAM_HORIZONTAL_FOV is None:
-    # Calibrate focal length using initial positions
+    # Calibrate focal length using given FOV
     FOCAL_LENGTH = calibrate_focal_length(
         *ball_projected_pos, initial_z=INITIAL_Z, initial_dst=BALL_DST
     )
+
 else:
+    # Calibrate focal length using initial positions
     FOCAL_LENGTH = (CAM_RESOLUTION[0] / 2) / np.tan(CAM_HORIZONTAL_FOV / 2 * (np.pi / 180))
 
 # Estimate actual ball radius if not ignored
-ball_actual_radius = BALL_RADIUS
 if not IGNORE_BALL_RADIUS and not WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
     # The balls may have a slightly different radius than assumed
-    ball_actual_radius = ball_projected_radius * INITIAL_Z / FOCAL_LENGTH
+    BALL_RADIUS = ball_projected_radius * INITIAL_Z / FOCAL_LENGTH
 
 # Set up display and UI
-width = frame_array.shape[0]
-height = frame_array.shape[1]
+width = CAM_RESOLUTION[0]
+height = CAM_RESOLUTION[1]
+
 screen = pg.display.set_mode((width, height))
+
 root = Root(screen, padding=PADDING)
 axis_widget = AxisWidget(
-    root, x=np.array((1, 0, 0)), y=np.array((0, 1, 0)), z=np.array((0, 0, 0))
+    root,
+    x=np.array((1, 0, 0)),
+    y=np.array((0, 1, 0)),
+    z=np.array((0, 0, 0)),
 )
 image_widget = ImageWidget(root, pixels=[], curr_pos=(0, 0))
-checkboxes = Checkboxes(root, options = ['DEBUG BALLS'], checked = [DEBUG_BALLS], req_width=200, background=(255,255,255))
+checkboxes = Checkboxes(
+    root,
+    options = ['DEBUG BALLS'],
+    checked = [DEBUG_BALLS],
+    req_width=200,
+    background=(255,255,255)
+    )
 
 root.update_layout()
 clock = pg.time.Clock()
+
 points = []  # List of pen tip positions
 paths = [[]]
 
@@ -181,10 +207,22 @@ while STATUS != "quit":
         except StopIteration:
             paths[-1] = median_line_smoothing(paths[-1], 10)
             points = [i for sublist in paths for i in sublist]
-            image_widget.set_data(points, None)
-            save_pixels(points, OUTPUT_FILENAME)
-            STATUS = "saved"
-            continue
+            save_pixels(points, QUEUE[queue_index]['output'])
+            queue_index += 1
+            if queue_index >= len(QUEUE):
+                STATUS = "saved"
+                continue
+
+            image_widget.set_data([], (0, 0))
+            axis_widget.set_axes(
+                                np.array((1, 0, 0)),
+                                np.array((0, 1, 0)),
+                                np.array((0, 0, 0)),
+                                )
+
+            video = video_generator(QUEUE[queue_index]['input'])
+            points = []  # List of pen tip positions
+            paths = [[]]
 
         pen_down = True
         if not IGNORE_AUDIO:
@@ -210,7 +248,7 @@ while STATUS != "quit":
                     width,
                     height,
                     FOCAL_LENGTH,
-                    ball_actual_radius,
+                    BALL_RADIUS,
                 )
             elif WEIGHTED_PIXELS_ELLIPSE_CORRECTION:
                 ball_projected_pos, ball_fractional_area = get_all_balls_weighted(
@@ -232,7 +270,7 @@ while STATUS != "quit":
                 scale_factors = distance_from_area(ball_fractional_area, BALL_RADIUS)
             else:
                 # Use projected and actual radii to solve for scale factors
-                z = ball_actual_radius / ball_projected_radius * FOCAL_LENGTH
+                z = BALL_RADIUS / ball_projected_radius * FOCAL_LENGTH
                 scale_factors = -z / ball_rays[:, 2]
             scale_factors = scale_factors * DST_CALIB_CONSTANT
             ball_actual_pos = ball_rays * scale_factors[:, np.newaxis]
