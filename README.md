@@ -45,7 +45,7 @@ Here's a more detailed explanation of the steps:
 
 ### Step 1: Get Video Frames and Audio
 
-I'm using the `av` library to read the video frames and extract the audio track. The frames are yielded as numpy arrays for further processing.
+I used the `av` library to read the video frames and extract the audio track. The frames are yielded as numpy arrays for further processing.
 
 ### Step 2: Threshold the frames
 
