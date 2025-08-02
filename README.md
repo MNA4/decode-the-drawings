@@ -441,7 +441,7 @@ pip install -r requirements.txt
 
 ## Usage
 1. Place your input video (e.g., `3.mp4`) in `./videos`.
-2. Adjust configuration parameters in `script.py` if needed (e.g., `VIDEO_PATH`, `PIXEL_THRESHOLD`, etc).
+2. Adjust configuration parameters in `script.py` if needed (e.g., `PIXEL_THRESHOLD`, etc).
    1. 
 3. Run the main script:
 ```
@@ -513,11 +513,12 @@ set the `CAM_HORIZONTAL_FOV` to None, if you want the program to calibrate focal
 `DST_CALIB_CONSTANT` is used to fine tune the distortions that are present in the image.
 
 ## File Overview
-- `script.py` — Main application logic and UI
+- `script.py` — Main application logic
 - `widgets.py` — Custom Pygame UI toolkit
 - `image_processing.py` — Ball detection and image utilities
 - `media.py` — Video and audio input utilities
-- `ball_vectors.py` — 3D geometry and math utilities
+- `vectors.py` — 3D geometry and math utilities
+- `smoothing.py` - Path smoothing utillities
 - `requirements.txt` — Python dependencies
 
 ## Notes
